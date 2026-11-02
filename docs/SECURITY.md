@@ -32,7 +32,7 @@ Protect the following values:
 - `~/.config/obsidian/a2rg-mcp-bridge/tls/localhost-key.pem`: contains the local
   TLS private key.
 - `plugin/data.json`: contains non-secret bridge settings.
-- `<vault>/.obsidian/plugins/mcp-vault-connector/cache/search-index-v1.json`: contains
+- `<Obsidian config directory>/plugins/mcp-vault-connector/cache/search-index-v1.json`: contains
   vault file names and posting metadata.
 - `.env`: contains `OBSIDIAN_API_KEY`.
 - MCP client configuration: may contain environment values or secret references.
@@ -48,9 +48,11 @@ HTTPS is recommended and certificate verification is always enabled. The MCP
 client refuses TLS certificates that it cannot verify against the configured
 CA; no environment variable can disable certificate verification.
 
-The plugin refuses to start the bridge when it detects plugin, data, TLS, or
-cache files with group/other-readable permissions. This check is platform
-specific and requires a filesystem that applies POSIX modes.
+The plugin refuses to start the bridge when the secure configuration directory,
+bearer-token file, or TLS private key has insecure POSIX permissions. It also
+checks that the TLS private key is stored inside the secure configuration
+directory. These checks are platform-specific and require a filesystem that
+applies POSIX modes.
 
 Do not use SSH port forwarding or reverse-proxy configuration that publishes:
 

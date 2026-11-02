@@ -57,6 +57,10 @@ Adds text to the end of a file.
 
 If the file does not exist, the operation creates it.
 
+The plugin accepts an append idempotency key and keeps completed append
+operations for five minutes. A repeated key with the same path and content
+does not append the content twice.
+
 ## `delete_file`
 
 Deletes a file.
@@ -97,7 +101,7 @@ by resolved incoming-link count when available.
 The plugin also persists a local snapshot in:
 
 ```text
-<vault>/.obsidian/plugins/mcp-vault-connector/cache/search-index-v1.json
+<Obsidian config directory>/plugins/mcp-vault-connector/cache/search-index-v1.json
 ```
 
 The snapshot contains document metadata and posting maps. It does not contain
@@ -193,3 +197,20 @@ Active file
 
 Fallback is per operation. A bridge failure does not invalidate the
 filesystem fallback configuration.
+
+| Operation | When Obsidian or the bridge is unavailable |
+|---|---|
+| `get_file` | Read through `OBSIDIAN_VAULT_PATH`. |
+| `search_vault` | Search the fallback trigram/bigram index. |
+| `list_files` | List direct children from the physical vault. |
+| `write_file` | Write to the physical vault unless a REST result is ambiguous. |
+| `append_file` | Append to the physical vault unless a REST result is ambiguous. |
+| `delete_file` | Delete from the physical vault unless a REST result is ambiguous. |
+| `get_linked_notes` | Return an empty list; resolved Obsidian metadata is unavailable. |
+| `get_active_file` | No fallback; require the plugin and an active Obsidian file. |
+
+Timed-out or reset write, append, and delete requests stop before filesystem
+fallback when the mutation status is ambiguous. This prevents a second mutation
+when the plugin may have applied the operation but the MCP client did not
+receive the response. Definite HTTP errors such as `401`, `404`, `413`, and
+other 4xx/5xx responses are not retried as fallback mutations.

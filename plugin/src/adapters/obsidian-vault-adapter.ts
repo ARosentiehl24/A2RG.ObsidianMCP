@@ -97,7 +97,7 @@ export class ObsidianVaultAdapter implements VaultPort {
       return false;
     }
 
-    await this.app.vault.delete(file);
+    await this.app.fileManager.trashFile(file);
     this.searchService.removeDocument(file.path);
     return true;
   }

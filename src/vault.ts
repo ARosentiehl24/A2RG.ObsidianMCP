@@ -27,13 +27,12 @@ export class VaultManager implements McpVaultPort {
   private searchIndexPromise: Promise<void> | null = null;
   private searchCacheSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(vaultPath: string) {
+  constructor(vaultPath: string, configDirPath?: string) {
     this.vaultPath = vaultPath;
     this.pathResolver = new VaultPathResolver(vaultPath);
     this.searchCache = new PersistentSearchCache(
       path.join(
-        vaultPath,
-        ".obsidian",
+        configDirPath || path.join(vaultPath, ".obsidian"),
         "plugins",
         "mcp-vault-connector",
         "cache",

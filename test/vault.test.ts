@@ -196,3 +196,31 @@ test("VaultManager persists and reloads the search snapshot", async () => {
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("VaultManager stores the search snapshot in a custom config directory", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "a2rg-custom-config-"));
+  const configDir = path.join(directory, "custom-obsidian");
+
+  try {
+    const vault = new VaultManager(directory, configDir);
+    await vault.writeFile("notes/custom.md", "Custom config cache");
+    assert.deepEqual(
+      (await vault.searchFiles("custom config")).map((match) => match.path),
+      ["notes/custom.md"],
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const cachePath = path.join(
+      configDir,
+      "plugins",
+      "mcp-vault-connector",
+      "cache",
+      "search-index-v1.json",
+    );
+    const snapshot = JSON.parse(await readFile(cachePath, "utf-8"));
+    assert.equal(snapshot.version, 1);
+    assert.ok(Array.isArray(snapshot.documents));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

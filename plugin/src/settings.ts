@@ -33,12 +33,14 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "A2RG MCP Bridge" });
+    new Setting(containerEl)
+      .setName("A2RG MCP Bridge")
+      .setHeading();
     containerEl.createEl("p", {
       text: "Connect MCP clients to the currently open Obsidian vault.",
     });
 
-    containerEl.createEl("h3", { text: "Status" });
+    new Setting(containerEl).setName("Status").setHeading();
 
     const running = this.plugin.isBridgeRunning();
     new Setting(containerEl)
@@ -58,7 +60,7 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
             } else {
               await this.plugin.startBridge();
             }
-            this.display();
+            this.update();
           }),
       );
 
@@ -77,7 +79,7 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
           }),
       );
 
-    containerEl.createEl("h3", { text: "Connection" });
+    new Setting(containerEl).setName("Connection").setHeading();
 
     new Setting(containerEl)
       .setName("Enable bridge")
@@ -88,7 +90,7 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
           .onChange(async (enabled) => {
             this.plugin.settings.enabled = enabled;
             await this.plugin.saveSettings();
-            this.display();
+            this.update();
           }),
       );
 
@@ -111,7 +113,7 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
             } else {
               await this.plugin.saveSettings();
             }
-            this.display();
+            this.update();
           }),
       );
 
@@ -132,11 +134,11 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
             }
             this.plugin.settings.port = port;
             await this.plugin.saveSettings();
-            this.display();
+            this.update();
           });
       });
 
-    containerEl.createEl("h3", { text: "Authentication" });
+    new Setting(containerEl).setName("Authentication").setHeading();
 
     new Setting(containerEl)
       .setName("Bearer token")
@@ -169,11 +171,11 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
           .setTooltip("Generate a new bearer token")
           .onClick(async () => {
             await this.plugin.generateToken();
-            this.display();
+            this.update();
           }),
       );
 
-    containerEl.createEl("h3", { text: "MCP setup" });
+    new Setting(containerEl).setName("MCP setup").setHeading();
 
     if (this.plugin.isTlsEnabled()) {
       new Setting(containerEl)
@@ -267,7 +269,7 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
           }),
       );
 
-    containerEl.createEl("h3", { text: "Security" });
+    new Setting(containerEl).setName("Security").setHeading();
 
     containerEl.createEl("p", {
       text: "The bridge listens only on 127.0.0.1. The bearer token and private key stay outside the vault.",

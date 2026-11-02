@@ -1,13 +1,16 @@
-# A2RG Obsidian MCP
+# A2RG MCP Bridge
 
-Hybrid Model Context Protocol (MCP) integration for Obsidian.
+A Bun-based Model Context Protocol (MCP) server for Obsidian, with a desktop
+bridge plugin and a direct filesystem fallback.
 
 The project has two cooperating components:
 
-- **A2RG MCP Bridge**, an Obsidian desktop plugin that reads and writes the
-  active vault through `App.vault`, `App.metadataCache`, and `App.workspace`.
-- **A2RG Obsidian MCP**, a Bun stdio server that exposes vault operations
-  to MCP clients.
+- **A2RG MCP Bridge** (`mcp-vault-connector`) reads and writes the active vault
+  through `App.vault`, `App.metadataCache`, and `App.workspace`.
+- **A2RG Obsidian MCP** runs over MCP stdio and exposes vault operations to
+  MCP clients.
+
+Current release: `1.0.1`.
 
 ## Architecture
 
@@ -16,15 +19,15 @@ MCP client
     |
     | stdio
     v
-A2RG Obsidian MCP
+A2RG Obsidian MCP (Bun executable)
     |
-    +--> http://127.0.0.1:27125
+    +--> https://127.0.0.1:27125
     |         |
     |         v
-    |    Obsidian plugin
+    |    A2RG MCP Bridge plugin
     |         |
     |         v
-    |    App.vault and App.workspace
+    |    App.vault / App.metadataCache / App.workspace
     |
     +--> OBSIDIAN_VAULT_PATH
               |
@@ -32,20 +35,20 @@ A2RG Obsidian MCP
          Direct Markdown files
 ```
 
-The plugin is the preferred active-Obsidian transport. If it is unavailable,
-the MCP server falls back to direct filesystem operations.
+The plugin bridge is preferred while Obsidian is running. If it is unavailable,
+supported operations can fall back to direct filesystem access.
 
 > [!IMPORTANT]
 > The bridge is local desktop infrastructure. It binds only to
-> `127.0.0.1:27125` and must not be published directly to the internet.
+> `127.0.0.1` and must not be published directly to the internet.
 
 ## Quick start
 
 Follow [Quick Start](docs/QUICKSTART.md) for the complete setup.
 
-The shortest working setup is:
+The shortest setup is:
 
-1. Build both components:
+1. Build the MCP executable and plugin:
 
    ```bash
    npm install
@@ -58,62 +61,46 @@ The shortest working setup is:
    <vault>/.obsidian/plugins/mcp-vault-connector/
    ```
 
-3. Enable **A2RG MCP Bridge** in Obsidian Community Plugins.
+3. Enable **A2RG MCP Bridge** under Obsidian Community Plugins.
 
-4. Open **Settings → Community Plugins → A2RG MCP Bridge**:
+4. In plugin settings:
+   - Enable the bridge.
+   - Keep port `27125` unless you deliberately change it.
+   - Enable local HTTPS.
+   - Copy or generate the bearer token.
+   - Copy the generated CA certificate path.
 
-   ```text
-   Enable bridge: enabled
-   Port: 27125
-   Bearer token: generated automatically
-   ```
-
-   ![A2RG MCP Bridge settings](docs/assets/plugin-settings.png)
-
-5. Copy `.env.example` to `.env` and set the plugin token:
-
-   ```bash
-   cp .env.example .env
-   ```
+5. Create `.env` from `.env.example`:
 
    ```dotenv
    OBSIDIAN_VAULT_PATH=/absolute/path/to/your/vault
-   OBSIDIAN_API_URL=http://127.0.0.1:27125
+   OBSIDIAN_API_URL=https://127.0.0.1:27125
    OBSIDIAN_API_KEY=replace-with-the-plugin-bearer-token
    OBSIDIAN_PREFER_REST=true
    OBSIDIAN_TIMEOUT_MS=3000
+   OBSIDIAN_CONFIG_DIR=/absolute/path/to/your/vault/.obsidian
+   OBSIDIAN_CA_CERT=/absolute/path/to/localhost.pem
    ```
 
-6. Start the MCP server:
-
-   ```bash
-   npm start
-   ```
-
-7. Register `.mcp.json` with your MCP client or use the absolute Bun
-   command shown in [MCP client configuration](#mcp-client-configuration).
+6. Register `dist/a2rg-obsidian-mcp` as the stdio MCP executable.
 
 ## Verify the setup
 
-First verify the plugin bridge:
+With HTTPS enabled:
 
 ```bash
 export OBSIDIAN_API_KEY='<paste-the-bearer-token>'
+
 curl --fail --silent \
-  -H "Authorization: Bearer ${OBSIDIAN_API_KEY}" \
-  http://127.0.0.1:27125/health
+  --cacert /absolute/path/to/localhost.pem \
+  -H "Authorization: Bearer $OBSIDIAN_API_KEY" \
+  https://127.0.0.1:27125/health
 ```
 
 Expected response:
 
 ```json
 {"status":"ok"}
-```
-
-Then verify the MCP stdio server:
-
-```bash
-./dist/a2rg-obsidian-mcp
 ```
 
 The MCP client should discover eight tools:
@@ -133,14 +120,14 @@ See [MCP tools](docs/TOOLS.md) for parameters and behavior.
 
 - Obsidian Desktop 1.14.4 or later.
 - Bun 1.4 or later.
-- Node.js 22 or later for plugin builds.
+- Node.js 22 or later for the plugin build.
 - npm.
 - A local Markdown vault.
-- A desktop MCP client that supports stdio servers.
+- An MCP client that supports stdio servers.
 
 ## MCP client configuration
 
-The repository includes `.mcp.json`:
+The repository includes `.mcp.json` as a local stdio configuration example:
 
 ```json
 {
@@ -154,12 +141,12 @@ The repository includes `.mcp.json`:
 }
 ```
 
-Use absolute paths for `OBSIDIAN_VAULT_PATH` and `dist/a2rg-obsidian-mcp`. Run
-`npm run build` after source changes.
+Use absolute paths for `OBSIDIAN_VAULT_PATH` and the Bun executable. Configure
+the environment in `.env` or in the MCP client's server configuration.
 
-For Claude, Copilot, Gemini, Cursor, and VS Code, configuration file names
-and fields differ. Keep the server definition equivalent: a stdio process,
-the absolute entry point, and access to the `.env` or process environment.
+Some clients use different configuration filenames or fields, but the effective
+definition is the same: one stdio process, an absolute executable path, and
+access to the vault environment.
 
 ## Plugin and MCP behavior
 
@@ -170,9 +157,12 @@ the absolute entry point, and access to the `.env` or process environment.
 | Append file | Plugin bridge | Filesystem fallback |
 | Delete file | Plugin bridge | Filesystem fallback |
 | List files | Plugin bridge | Filesystem fallback |
-| Search vault | Plugin bridge | Filesystem fallback |
+| Search vault | Plugin bridge | Indexed filesystem fallback |
 | Linked notes | Obsidian resolved-link graph | Empty fallback |
 | Active file | Plugin bridge only | No active file |
+
+Ambiguous transport failures skip filesystem fallback for write, append, and
+delete operations to avoid duplicating a mutation whose REST result is unknown.
 
 ## Documentation
 
@@ -185,25 +175,26 @@ the absolute entry point, and access to the `.env` or process environment.
 ## Development
 
 ```bash
+npm test
 npm run dev:mcp
 npm run dev:plugin
-npm test
 npm run build
 ```
 
-`npm run build` compiles the MCP server into a Bun executable and bundles
-`main.js` for the plugin. It also type-checks plugin source code.
+`npm test` uses Bun's test runner. `npm run build` type-checks the plugin,
+bundles `main.js`, and compiles `dist/a2rg-obsidian-mcp`.
 
 ## Release
 
 Plugin releases are automated by `.github/workflows/release.yml`.
 
-1. Commit and push the source changes.
-2. Update `manifest.json`, `package.json`, `package-lock.json`, and
-   `versions.json` to the next release.
+1. Update `manifest.json`, `package.json`, `package-lock.json`, and
+   `versions.json`.
+2. Commit and push the source changes.
 3. Create and push a tag matching `manifest.json.version`.
-4. Publish the draft GitHub release created by the workflow.
-5. Submit or update the plugin in the Obsidian community directory.
+4. Let GitHub Actions build, test, attest, and create a draft release.
+5. Publish the draft with `main.js` and `manifest.json` attached.
+6. Submit or update the plugin in the Obsidian community directory.
 
 ## Security boundary
 
@@ -212,8 +203,8 @@ Plugin releases are automated by `.github/workflows/release.yml`.
 - Relative vault paths are validated.
 - Absolute paths and `.` / `..` path segments are rejected.
 - Request bodies are capped at 5 MB.
-- The plugin does not expose public HTTPS.
-- The direct filesystem fallback is not a substitute for remote authentication.
+- Certificate and private-key material is kept outside the vault.
+- The fallback does not replace authentication for a remote service.
 
-Read [Security and Public Deployment](docs/SECURITY.md) before adding TLS,
-reverse proxying, containers, SSH forwarding, or public network access.
+Read [Security and Public Deployment](docs/SECURITY.md) before changing the
+loopback-only deployment model.

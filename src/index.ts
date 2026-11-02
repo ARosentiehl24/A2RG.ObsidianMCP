@@ -17,14 +17,14 @@ const api = new ApiClient(
   config.requestTimeoutMs,
   config.tlsCaCertPath,
 );
-const vault = new VaultManager(config.vaultPath);
+const vault = new VaultManager(config.vaultPath, config.configDirPath);
 const router = new HybridRouter(api, vault, config.preferRestApi);
 const toolRegistry = new McpToolRegistry(router);
 
 const server = new Server(
   {
     name: "a2rg-obsidian-mcp",
-    version: "0.1.0",
+    version: "1.0.1",
   },
   {
     capabilities: {
