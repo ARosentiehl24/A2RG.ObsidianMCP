@@ -29,6 +29,10 @@ class BridgeHttpError extends Error {
   }
 }
 
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export class HttpBridge {
   private server: Server | null = null;
   private readonly appendOperations = new Map<
@@ -55,7 +59,7 @@ export class HttpBridge {
       throw new Error("HTTP bridge token is required");
     }
 
-    this.server = this.options.tls
+    const server = this.options.tls
       ? createHttpsServer(
           {
             cert: this.options.tls.certificate,
@@ -69,9 +73,9 @@ export class HttpBridge {
       : createHttpServer((request, response) => {
       void this.handleRequest(request, response);
         });
+    this.server = server;
 
     await new Promise<void>((resolve, reject) => {
-      const server = this.server as Server;
       const onError = (error: Error) => {
         server.off("listening", onListening);
         reject(error);
@@ -337,8 +341,17 @@ export class HttpBridge {
       const chunks: Buffer[] = [];
       let size = 0;
 
-      request.on("data", (chunk: Buffer | string) => {
-        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      request.on("data", (chunk: unknown) => {
+        let buffer: Buffer;
+        if (typeof chunk === "string") {
+          buffer = Buffer.from(chunk, "utf-8");
+        } else if (Buffer.isBuffer(chunk)) {
+          buffer = chunk;
+        } else {
+          reject(new Error("Invalid request body chunk"));
+          request.destroy();
+          return;
+        }
         size += buffer.byteLength;
         if (size > MAX_BODY_BYTES) {
           reject(new Error("Request body exceeds the 5 MB limit"));
@@ -364,10 +377,10 @@ export class HttpBridge {
     } catch {
       throw new BridgeHttpError(400, "Invalid JSON body");
     }
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    if (!isJsonObject(parsed)) {
       throw new BridgeHttpError(400, "JSON body must be an object");
     }
-    return parsed as Record<string, unknown>;
+    return parsed;
   }
 
   private sendText(response: ServerResponse, status: number, text: string): void {

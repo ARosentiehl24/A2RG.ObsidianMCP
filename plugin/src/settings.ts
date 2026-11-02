@@ -26,6 +26,50 @@ export const DEFAULT_SETTINGS: BridgeSettings = {
   tlsFingerprint: "",
 };
 
+export function sanitizeBridgeSettings(value: unknown): BridgeSettings {
+  const defaults = { ...DEFAULT_SETTINGS, token: "" };
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return defaults;
+  }
+
+  const enabled = readProperty(value, "enabled");
+  const port = readProperty(value, "port");
+  const tlsEnabled = readProperty(value, "tlsEnabled");
+  const tlsCertificatePath = readProperty(value, "tlsCertificatePath");
+  const tlsPrivateKeyPath = readProperty(value, "tlsPrivateKeyPath");
+  const tlsFingerprint = readProperty(value, "tlsFingerprint");
+
+  return {
+    enabled: typeof enabled === "boolean" ? enabled : defaults.enabled,
+    port:
+      typeof port === "number"
+      && Number.isInteger(port)
+      && port >= 1
+      && port <= 65535
+        ? port
+        : defaults.port,
+    token: "",
+    tlsEnabled:
+      typeof tlsEnabled === "boolean" ? tlsEnabled : defaults.tlsEnabled,
+    tlsCertificatePath:
+      typeof tlsCertificatePath === "string"
+        ? tlsCertificatePath
+        : defaults.tlsCertificatePath,
+    tlsPrivateKeyPath:
+      typeof tlsPrivateKeyPath === "string"
+        ? tlsPrivateKeyPath
+        : defaults.tlsPrivateKeyPath,
+    tlsFingerprint:
+      typeof tlsFingerprint === "string"
+        ? tlsFingerprint
+        : defaults.tlsFingerprint,
+  };
+}
+
+function readProperty(value: object, key: string): unknown {
+  return Object.getOwnPropertyDescriptor(value, key)?.value;
+}
+
 export class A2rgBridgeSettingTab extends PluginSettingTab {
   constructor(
     app: App,
