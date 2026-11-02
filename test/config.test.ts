@@ -5,6 +5,7 @@ import { loadConfig } from "../src/config";
 test("loadConfig reads HTTPS and vault environment values", () => {
   const keys = [
     "OBSIDIAN_VAULT_PATH",
+    "OBSIDIAN_CONFIG_DIR",
     "OBSIDIAN_API_URL",
     "OBSIDIAN_API_KEY",
     "OBSIDIAN_PREFER_REST",
@@ -17,6 +18,7 @@ test("loadConfig reads HTTPS and vault environment values", () => {
 
   try {
     process.env.OBSIDIAN_VAULT_PATH = "/tmp/test-vault";
+    process.env.OBSIDIAN_CONFIG_DIR = "/tmp/test-vault/.obsidian";
     process.env.OBSIDIAN_API_URL = "https://127.0.0.1:27125";
     process.env.OBSIDIAN_API_KEY = "test-key";
     process.env.OBSIDIAN_PREFER_REST = "true";
@@ -25,6 +27,7 @@ test("loadConfig reads HTTPS and vault environment values", () => {
 
     const config = loadConfig();
     assert.equal(config.vaultPath, "/tmp/test-vault");
+    assert.equal(config.configDirPath, "/tmp/test-vault/.obsidian");
     assert.equal(config.apiUrl, "https://127.0.0.1:27125");
     assert.equal(config.apiKey, "test-key");
     assert.equal(config.preferRestApi, true);
@@ -70,6 +73,23 @@ test("loadConfig rejects non-loopback API hosts", () => {
       delete process.env.OBSIDIAN_API_URL;
     } else {
       process.env.OBSIDIAN_API_URL = previous;
+    }
+  }
+});
+
+test("loadConfig rejects relative Obsidian config directories", () => {
+  const previous = process.env.OBSIDIAN_CONFIG_DIR;
+  try {
+    process.env.OBSIDIAN_CONFIG_DIR = "custom-obsidian";
+    assert.throws(
+      () => loadConfig(),
+      /absolute directory path/,
+    );
+  } finally {
+    if (previous === undefined) {
+      delete process.env.OBSIDIAN_CONFIG_DIR;
+    } else {
+      process.env.OBSIDIAN_CONFIG_DIR = previous;
     }
   }
 });

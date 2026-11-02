@@ -2,19 +2,27 @@
 
 This plugin is the active-Obsidian adapter for A2RG Obsidian MCP.
 
+Community plugin ID: `mcp-vault-connector`
+
+Current manifest version: `1.0.1`
+
 ## Responsibilities
 
 The plugin:
 
-- Reads the active Obsidian instance through `App.vault` and `App.workspace`.
-- Registers the local MCP bridge commands.
-- Starts and stops an HTTP server on loopback.
+- Reads the active Obsidian instance through `App.vault`,
+  `App.metadataCache`, and `App.workspace`.
+- Starts and stops an HTTP or HTTPS server on loopback.
 - Authenticates requests with a bearer token.
+- Generates a local TLS certificate and private key.
 - Creates missing parent folders during writes.
-- Validates relative vault paths.
+- Rejects hidden, absolute, traversal, unsupported-extension, symlink, and
+  ambiguous vault paths.
+- Searches Markdown files with an in-memory and persistent index.
+- Returns resolved incoming and outgoing internal-link neighbors.
 
 The MCP server is a separate Bun stdio process. The plugin does not implement
-the Model Context Protocol.
+the Model Context Protocol itself.
 
 ## Installation
 
@@ -34,10 +42,6 @@ Copy `manifest.json` and `main.js` into:
 Restart Obsidian or reload Community Plugins, then enable
 **A2RG MCP Bridge**.
 
-The settings page shows the enable toggle, loopback port, and bearer token:
-
-![A2RG MCP Bridge settings](assets/plugin-settings.png)
-
 ## Settings
 
 Settings are stored in:
@@ -46,46 +50,65 @@ Settings are stored in:
 <vault>/.obsidian/plugins/mcp-vault-connector/data.json
 ```
 
-The settings file uses this shape:
+The settings file contains non-secret state similar to:
 
 ```json
 {
   "enabled": true,
   "port": 27125,
-  "tlsEnabled": true
+  "tlsEnabled": true,
+  "tlsCertificatePath": "/absolute/path/to/localhost.pem",
+  "tlsPrivateKeyPath": "/absolute/path/to/localhost-key.pem",
+  "tlsFingerprint": "SHA-256 fingerprint"
 }
 ```
 
-The bearer token and TLS private key are not stored in `data.json` or the
-vault. They are stored under:
+The bearer token field is excluded from saved settings. The bearer token and
+TLS private key are stored outside the vault under:
 
 ```text
 ~/.config/obsidian/a2rg-mcp-bridge/
 ~/.config/obsidian/a2rg-mcp-bridge/tls/
 ```
 
-These files use private POSIX permissions when supported. Do not commit or
-share `data.json`, the token file, or the TLS private key.
+On macOS and Windows, the secure configuration directory follows the
+application data location used by Obsidian.
 
-### Port
+The settings page provides:
 
-The plugin binds to `127.0.0.1` only. The port must be between `1` and `65535`.
+- Bridge start/stop status.
+- Loopback URL copy.
+- Enable/disable bridge toggle.
+- Local HTTPS toggle.
+- Loopback port control.
+- Bearer token copy.
+- Bearer token rotation.
+- Local certificate path, public certificate, and replacement controls.
+- MCP environment variable copy.
+- Authenticated health-check command copy.
 
-Changing the port restarts the bridge. Set the matching URL in
+Do not commit or share `data.json`, the bearer token, or the TLS private key.
+
+## Port
+
+The plugin binds only to `127.0.0.1`. The port must be an integer from `1`
+through `65535`; the default is `27125`.
+
+Changing the port restarts the bridge. Set the matching
 `OBSIDIAN_API_URL` in the MCP environment.
 
-### Bearer token
+## Bearer token
 
-The token is a 32-byte random value encoded as 64 hexadecimal characters.
-The plugin stores it in `~/.config/obsidian/a2rg-mcp-bridge/token`, and the
-MCP server receives the same value through `OBSIDIAN_API_KEY`.
+The token is 32 random bytes represented as 64 hexadecimal characters.
+The plugin stores it in `~/.config/obsidian/a2rg-mcp-bridge/token`, and the MCP
+server receives the same value through `OBSIDIAN_API_KEY`.
 
 Rotate the token when:
 
 - A machine or MCP configuration may have been copied.
 - A user no longer needs MCP access.
-- The existing token is exposed in logs or command history.
-- Security credentials are being reissued as routine maintenance.
+- The existing token was exposed in logs or screenshots.
+- Credentials are being reissued as maintenance.
 
 After rotation:
 
@@ -93,6 +116,20 @@ After rotation:
 2. Restart MCP clients.
 3. Confirm `/health` succeeds.
 4. Remove old values from shell history and secret stores.
+
+## HTTPS
+
+Local HTTPS is optional. It is recommended for normal use and uses a generated
+self-signed certificate that is verified by the MCP client through the
+configured CA.
+
+When HTTPS is enabled:
+
+- Set `OBSIDIAN_API_URL=https://127.0.0.1:<port>`.
+- Set `OBSIDIAN_CA_CERT` to the plugin's generated CA certificate path.
+- The plugin will refuse to start if required secret files are not private.
+
+HTTP is retained for local testing. It must remain loopback-only.
 
 ## Commands
 
@@ -122,20 +159,47 @@ The bridge is local infrastructure, not a public API:
 | `PUT` | `/vault/<path>` | Create or replace a vault file. |
 | `DELETE` | `/vault/<path>` | Delete a vault file. |
 
-Send the token as:
+Authenticated requests use:
 
 ```text
 Authorization: Bearer <token>
 ```
 
-The plugin returns `401` for missing or invalid credentials and `404` for
-missing files.
+The plugin returns `401` for missing or invalid credentials, `404` for missing
+files, and validation errors for unsafe paths or unsupported operations.
+
+## Search and cache
+
+The plugin maintains a trigram/bigram posting index for note names and
+Markdown content, plus headings, tags, and frontmatter metadata.
+
+The index is updated on create, modify, rename, delete, metadata-change, and
+metadata-delete events. Search results are ranked by resolved incoming-link
+count when available.
+
+The plugin persists a snapshot under the plugin manifest directory:
+
+```text
+<Obsidian config directory>/plugins/mcp-vault-connector/cache/search-index-v1.json
+```
+
+The snapshot is restored if fresh, and only document metadata and posting maps
+are persisted. Full note contents and complete search-result payloads are not
+stored in the snapshot.
+
+## Graph
+
+The graph tool uses Obsidian's `resolvedLinks` metadata cache. It can traverse
+incoming, outgoing, or both directions with a depth from `1` to `3`.
+
+If the bridge is unavailable, the filesystem fallback has no resolved-link
+metadata and returns an empty linked-note list.
 
 ## Development
 
 ```bash
-npm run dev:plugin
 npm test
+npm run dev:plugin
 npm run build
 ```
 
@@ -146,5 +210,5 @@ Obsidian plugin releases require:
 
 - `manifest.json`
 - `main.js`
-- Optional `styles.css`
 - A GitHub tag matching `manifest.json.version`
+- Optional `styles.css` if the plugin ships one

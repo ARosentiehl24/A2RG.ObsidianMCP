@@ -17,7 +17,7 @@ export class ObsidianSearchService {
   private readonly searchCache: PersistentSearchCache | null;
   private searchIndexReady = false;
   private searchIndexPromise: Promise<void> | null = null;
-  private searchCacheSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private searchCacheSaveTimer: number | null = null;
   private readonly incomingLinkCounts = new Map<string, number>();
 
   constructor(
@@ -184,7 +184,7 @@ export class ObsidianSearchService {
 
   async flushSearchCache(): Promise<void> {
     if (this.searchCacheSaveTimer !== null) {
-      clearTimeout(this.searchCacheSaveTimer);
+      window.clearTimeout(this.searchCacheSaveTimer);
       this.searchCacheSaveTimer = null;
     }
     await this.saveSearchCache();
@@ -322,9 +322,9 @@ export class ObsidianSearchService {
       return;
     }
     if (this.searchCacheSaveTimer !== null) {
-      clearTimeout(this.searchCacheSaveTimer);
+      window.clearTimeout(this.searchCacheSaveTimer);
     }
-    this.searchCacheSaveTimer = setTimeout(() => {
+    this.searchCacheSaveTimer = window.setTimeout(() => {
       this.searchCacheSaveTimer = null;
       void this.saveSearchCache();
     }, 250);

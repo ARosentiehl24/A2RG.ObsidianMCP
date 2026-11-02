@@ -40,6 +40,20 @@ OBSIDIAN_VAULT_PATH=/absolute/path/to/your/vault
 
 `get_active_file` has no filesystem fallback.
 
+## HTTPS is enabled but the MCP server fails TLS verification
+
+When `OBSIDIAN_API_URL=https://127.0.0.1:27125`, set
+`OBSIDIAN_CA_CERT` to the exact certificate path shown in plugin settings.
+
+```dotenv
+OBSIDIAN_API_URL=https://127.0.0.1:27125
+OBSIDIAN_CA_CERT=/absolute/path/to/localhost.pem
+```
+
+Restart the MCP client after changing the CA path. Do not disable certificate
+verification. The generated self-signed certificate is valid only for this
+loopback setup and is not for a public HTTPS server.
+
 ## HTTP `401 Unauthorized`
 
 The bearer token differs between plugin and MCP environment.
