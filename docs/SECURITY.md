@@ -1,0 +1,187 @@
+# Security and Public Deployment
+
+## Supported deployment model
+
+A2RG MCP Bridge is designed for a single desktop machine:
+
+```text
+MCP client -> MCP stdio process -> 127.0.0.1 plugin bridge -> Obsidian
+```
+
+The plugin server binds only to `127.0.0.1`. It must not be exposed directly
+to the public internet.
+
+If Obsidian is closed, the MCP server should use
+`OBSIDIAN_VAULT_PATH` for direct filesystem fallback. The fallback is a local
+desktop feature and is not a substitute for authentication in a remote service.
+
+## Authentication
+
+Every bridge request requires a bearer token:
+
+```text
+Authorization: Bearer <64-character-token>
+```
+
+The token is generated with 32 random bytes and represented by 64 hexadecimal
+characters. It is not a TLS certificate, private key, or public key.
+
+Protect the following values:
+
+- `~/.config/obsidian/a2rg-mcp-bridge/token`: contains the plugin bearer token.
+- `~/.config/obsidian/a2rg-mcp-bridge/tls/localhost-key.pem`: contains the local
+  TLS private key.
+- `plugin/data.json`: contains non-secret bridge settings.
+- `<vault>/.obsidian/plugins/a2rg-mcp-bridge/cache/search-index-v1.json`: contains
+  vault file names and posting metadata.
+- `.env`: contains `OBSIDIAN_API_KEY`.
+- MCP client configuration: may contain environment values or secret references.
+- Shell history: may contain token values if commands are pasted insecurely.
+
+Do not place bearer tokens in Markdown notes, issue reports, screenshots,
+source control, or public documentation.
+
+## Transport security
+
+The bridge binds only to loopback. HTTP is supported for local testing, while
+HTTPS is recommended and certificate verification is always enabled. The MCP
+client refuses TLS certificates that it cannot verify against the configured
+CA; no environment variable can disable certificate verification.
+
+The plugin refuses to start the bridge when it detects plugin, data, TLS, or
+cache files with group/other-readable permissions. This check is platform
+specific and requires a filesystem that applies POSIX modes.
+
+Do not use SSH port forwarding or reverse-proxy configuration that publishes:
+
+- `127.0.0.1:27125`
+- `/vault/*`
+- `/append`
+- `/delete`
+- `/active`
+
+without both authentication and TLS.
+
+There is no CORS or browser login flow. Bearer authentication alone is not
+enough for a public network endpoint.
+
+## Using HTTPS for a public server
+
+This repository does not expose an MCP HTTP server or implement public HTTPS.
+For a public deployment, HTTPS belongs at the external MCP server boundary,
+not in the loopback Obsidian plugin.
+
+Recommended architecture:
+
+```text
+Public client
+  -> TLS reverse proxy
+  -> authenticated MCP HTTP/SSE service
+  -> server filesystem or server-side vault API
+
+Obsidian desktop
+  -> loopback plugin bridge
+  -> MCP stdio client on the same desktop
+```
+
+Do not send desktop vault credentials to an untrusted remote server.
+
+## Certificate files
+
+A public HTTPS server needs a certificate chain and private key:
+
+| File | Purpose | Permissions |
+|---|---|---|
+| `fullchain.pem` | Public certificate chain sent to clients. | `0644` |
+| `privkey.pem` | Server private key. | `0600`, ideally restricted to the service account. |
+
+Use a certificate issued for the public hostname, such as a certificate from
+Let's Encrypt. Do not use a self-signed certificate for a public endpoint.
+
+Keep private keys outside source control and plugin settings:
+
+```text
+/etc/a2rg-mcp/tls/fullchain.pem
+/etc/a2rg-mcp/tls/privkey.pem
+```
+
+Example permissions:
+
+```bash
+sudo chmod 600 /etc/a2rg-mcp/tls/privkey.pem
+sudo chmod 755 /etc/a2rg-mcp/tls
+sudo chown root:a2rg-mcp /etc/a2rg-mcp/tls/privkey.pem
+sudo chmod 644 /etc/a2rg-mcp/tls/fullchain.pem
+```
+
+The exact service account and group names depend on the host.
+
+For local TLS testing, a self-signed certificate can be generated, but clients
+must explicitly trust or verify it. The plugin writes the generated certificate
+and private key outside the vault at
+`~/.config/obsidian/a2rg-mcp-bridge/tls/`. Copy
+`localhost.pem` to `OBSIDIAN_CA_CERT`; it is not intended for public HTTPS:
+
+```bash
+openssl req -x509 -nodes -newkey rsa:2048 \
+  -keyout privkey.pem \
+  -out fullchain.pem \
+  -days 30 \
+  -subj "/CN=localhost"
+```
+
+This command is for testing only. Public browsers and API clients will not
+trust this certificate automatically.
+
+## Reverse proxy requirements
+
+A reverse proxy should:
+
+- Listen on public HTTPS port `443`.
+- Serve a valid certificate for the public hostname.
+- Forward traffic only to an authenticated loopback MCP service.
+- Set reasonable request-size limits.
+- Disable public access to plugin administration endpoints.
+- Apply rate limiting and audit logging.
+- Strip untrusted `Authorization`, forwarding headers, and routing headers.
+- Run with a minimal service account.
+- Rotate private keys, bearer tokens, and certificates according to policy.
+
+An example Caddy file can obtain certificates automatically:
+
+```caddy
+mcp.example.com {
+  reverse_proxy 127.0.0.1:3000
+}
+```
+
+This example requires a public DNS record and a Caddy listener on port `3000`
+that implements MCP authentication. It does not expose the Obsidian plugin
+bridge.
+
+## Vault data protections
+
+- Use an allowlisted, absolute vault path.
+- Do not run the fallback against `/`, `/home`, or a parent directory containing
+  unrelated credentials.
+- Back up the vault before enabling remote write operations.
+- Reject path traversal and absolute paths at every trust boundary.
+- Limit request bodies and search result counts.
+- Do not expose deletion as a public operation without confirmation and audit
+  controls.
+- Review files and permissions after writes.
+
+## Vulnerability reporting
+
+Do not open a public issue for an unpatched credential leak or remote vault
+write vulnerability.
+
+Report suspected vulnerabilities privately to the repository maintainer with:
+
+- Affected version or commit.
+- Attack prerequisites.
+- Reproduction steps.
+- Impact.
+- Suggested remediation.
+
+Rotate a compromised token before publishing details.

@@ -1,0 +1,10 @@
+{
+  "id": "a2rg-mcp-bridge",
+  "name": "A2RG MCP Bridge",
+  "version": "1.0.0",
+  "minAppVersion": "1.14.4",
+  "description": "Secure local bridge for the A2RG Obsidian MCP server.",
+  "author": "Alberto",
+  "authorUrl": "https://github.com/ARosentiehl24",
+  "isDesktopOnly": true
+}

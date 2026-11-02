@@ -1,4 +1,13 @@
 node_modules/
 dist/
+.codebase-memory/
+main.js
+*.map
 *.log
 .env
+data.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt

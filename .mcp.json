@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "obsidian": {
+      "type": "stdio",
+      "command": "/home/a2rg/.copilot/repos/A2RG.ObsidianMCP/dist/a2rg-obsidian-mcp",
+      "args": [],
+      "env": {
+        "OBSIDIAN_API_URL": "https://127.0.0.1:27125",
+        "OBSIDIAN_VAULT_PATH": "/home/a2rg/OneDrive/Obsidian Vault",
+        "OBSIDIAN_PREFER_REST": "true",
+        "OBSIDIAN_TIMEOUT_MS": "3000",
+        "OBSIDIAN_CA_CERT": "/home/a2rg/.config/obsidian/a2rg-mcp-bridge/tls/localhost.pem"
+      }
+    }
+  }
+}
