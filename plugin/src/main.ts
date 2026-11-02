@@ -179,7 +179,7 @@ export default class A2rgMcpBridgePlugin extends Plugin {
           certificate: material.certificate,
           privateKey: material.privateKey,
         };
-      } catch (error) {
+      } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         new Notice(`Could not load the local TLS certificate: ${message}`);
         return;
@@ -196,7 +196,7 @@ export default class A2rgMcpBridgePlugin extends Plugin {
     try {
       const address = await this.bridge.start();
       new Notice(`A2RG MCP bridge running on 127.0.0.1:${address.port}`);
-    } catch (error) {
+    } catch (error: unknown) {
       this.bridge = null;
       const message = error instanceof Error ? error.message : String(error);
       new Notice(`Could not start A2RG MCP bridge: ${message}`);

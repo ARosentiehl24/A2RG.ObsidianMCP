@@ -4,7 +4,7 @@ This plugin is the active-Obsidian adapter for A2RG Obsidian MCP.
 
 Community plugin ID: `mcp-vault-connector`
 
-Current manifest version: `1.0.1`
+Current manifest version: `1.0.2`
 
 ## Responsibilities
 
