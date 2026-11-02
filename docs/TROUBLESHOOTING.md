@@ -165,7 +165,7 @@ imports or uploads into smaller confirmed operations.
 Settings are stored in:
 
 ```text
-<vault>/.obsidian/plugins/a2rg-mcp-bridge/data.json
+<vault>/.obsidian/plugins/mcp-vault-connector/data.json
 ```
 
 The bearer token and TLS private key are stored outside the vault at:

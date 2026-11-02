@@ -35,7 +35,7 @@ export class VaultManager implements McpVaultPort {
         vaultPath,
         ".obsidian",
         "plugins",
-        "a2rg-mcp-bridge",
+        "mcp-vault-connector",
         "cache",
         "search-index-v1.json",
       ),

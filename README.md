@@ -55,7 +55,7 @@ The shortest working setup is:
 2. Copy `manifest.json` and `main.js` into:
 
    ```text
-   <vault>/.obsidian/plugins/a2rg-mcp-bridge/
+   <vault>/.obsidian/plugins/mcp-vault-connector/
    ```
 
 3. Enable **A2RG MCP Bridge** in Obsidian Community Plugins.

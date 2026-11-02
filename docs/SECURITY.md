@@ -32,7 +32,7 @@ Protect the following values:
 - `~/.config/obsidian/a2rg-mcp-bridge/tls/localhost-key.pem`: contains the local
   TLS private key.
 - `plugin/data.json`: contains non-secret bridge settings.
-- `<vault>/.obsidian/plugins/a2rg-mcp-bridge/cache/search-index-v1.json`: contains
+- `<vault>/.obsidian/plugins/mcp-vault-connector/cache/search-index-v1.json`: contains
   vault file names and posting metadata.
 - `.env`: contains `OBSIDIAN_API_KEY`.
 - MCP client configuration: may contain environment values or secret references.

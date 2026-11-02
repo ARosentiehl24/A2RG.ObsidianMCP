@@ -28,7 +28,7 @@ npm run build
 Copy `manifest.json` and `main.js` into:
 
 ```text
-<vault>/.obsidian/plugins/a2rg-mcp-bridge/
+<vault>/.obsidian/plugins/mcp-vault-connector/
 ```
 
 Restart Obsidian or reload Community Plugins, then enable
@@ -43,7 +43,7 @@ The settings page shows the enable toggle, loopback port, and bearer token:
 Settings are stored in:
 
 ```text
-<vault>/.obsidian/plugins/a2rg-mcp-bridge/data.json
+<vault>/.obsidian/plugins/mcp-vault-connector/data.json
 ```
 
 The settings file uses this shape:
