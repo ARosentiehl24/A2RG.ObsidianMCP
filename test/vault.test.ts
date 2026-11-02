@@ -178,7 +178,7 @@ test("VaultManager persists and reloads the search snapshot", async () => {
       directory,
       ".obsidian",
       "plugins",
-      "a2rg-mcp-bridge",
+      "mcp-vault-connector",
       "cache",
       "search-index-v1.json",
     );

@@ -97,7 +97,7 @@ by resolved incoming-link count when available.
 The plugin also persists a local snapshot in:
 
 ```text
-<vault>/.obsidian/plugins/a2rg-mcp-bridge/cache/search-index-v1.json
+<vault>/.obsidian/plugins/mcp-vault-connector/cache/search-index-v1.json
 ```
 
 The snapshot contains document metadata and posting maps. It does not contain

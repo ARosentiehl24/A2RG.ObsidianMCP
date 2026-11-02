@@ -1,7 +1,7 @@
 {
-  "id": "a2rg-mcp-bridge",
+  "id": "mcp-vault-connector",
   "name": "A2RG MCP Bridge",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minAppVersion": "1.14.4",
   "description": "Secure local bridge for the A2RG Obsidian MCP server.",
   "author": "Alberto",

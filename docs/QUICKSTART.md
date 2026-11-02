@@ -42,7 +42,7 @@ manifest.json
 Create this directory if it does not exist:
 
 ```text
-<vault>/.obsidian/plugins/a2rg-mcp-bridge/
+<vault>/.obsidian/plugins/mcp-vault-connector/
 ```
 
 Copy the generated files:
@@ -56,8 +56,8 @@ Example copy command:
 
 ```bash
 VAULT='/absolute/path/to/your/vault'
-mkdir -p "$VAULT/.obsidian/plugins/a2rg-mcp-bridge"
-cp manifest.json main.js "$VAULT/.obsidian/plugins/a2rg-mcp-bridge/"
+mkdir -p "$VAULT/.obsidian/plugins/mcp-vault-connector"
+cp manifest.json main.js "$VAULT/.obsidian/plugins/mcp-vault-connector/"
 ```
 
 Restart Obsidian or reload Community Plugins. Enable
