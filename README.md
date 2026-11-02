@@ -10,7 +10,7 @@ The project has two cooperating components:
 - **A2RG Obsidian MCP** runs over MCP stdio and exposes vault operations to
   MCP clients.
 
-Current release: `1.0.1`.
+Current release: `1.0.2`.
 
 ## Architecture
 

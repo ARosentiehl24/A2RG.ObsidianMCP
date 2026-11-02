@@ -1,6 +1,10 @@
 import http from "node:http";
 import https from "node:https";
 import { readFileSync } from "node:fs";
+import {
+  clearTimeout as clearNodeTimeout,
+  setTimeout as setNodeTimeout,
+} from "node:timers";
 
 export interface HttpRequestOptions {
   method: string;
@@ -28,7 +32,7 @@ export class HttpTransport {
     if (caCertPath) {
       try {
         this.caCert = readFileSync(caCertPath);
-      } catch (error) {
+      } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(`Could not read TLS CA certificate: ${message}`);
       }
@@ -67,20 +71,20 @@ export class HttpTransport {
           : {}),
       };
 
-      let timeout: ReturnType<typeof globalThis.setTimeout>;
+      let timeout: ReturnType<typeof setNodeTimeout>;
       let timedOut = false;
 
       const request = url.protocol === "https:"
         ? https.request(requestOptions as https.RequestOptions, handleResponse)
         : http.request(requestOptions as http.RequestOptions, handleResponse);
 
-      timeout = globalThis.setTimeout(() => {
+      timeout = setNodeTimeout(() => {
         timedOut = true;
         request.destroy(new Error("Request timeout"));
       }, this.timeoutMs);
 
       request.on("error", (error: NodeJS.ErrnoException) => {
-        globalThis.clearTimeout(timeout);
+        clearNodeTimeout(timeout);
         const code =
           error && typeof error === "object" && "code" in error
             ? String((error as NodeJS.ErrnoException).code ?? "")
@@ -109,11 +113,11 @@ export class HttpTransport {
         let rejectedForSize = false;
 
         response.setEncoding("utf-8");
-        response.on("data", (chunk) => {
+        response.on("data", (chunk: string) => {
           bodyBytes += Buffer.byteLength(chunk);
           if (bodyBytes > maxResponseBytes) {
             rejectedForSize = true;
-            globalThis.clearTimeout(timeout);
+            clearNodeTimeout(timeout);
             response.destroy();
             resolve({
               ok: false,
@@ -130,7 +134,7 @@ export class HttpTransport {
           if (rejectedForSize) {
             return;
           }
-          globalThis.clearTimeout(timeout);
+          clearNodeTimeout(timeout);
           const contentType = response.headers["content-type"] ?? "";
           let data: unknown = body;
 

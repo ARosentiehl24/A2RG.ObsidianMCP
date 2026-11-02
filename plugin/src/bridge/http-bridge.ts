@@ -103,7 +103,7 @@ export class HttpBridge {
 
     await new Promise<void>((resolve, reject) => {
       server.close((error) => {
-        if (error) {
+        if (error instanceof Error) {
           reject(error);
           return;
         }
@@ -295,7 +295,7 @@ export class HttpBridge {
       }
 
       this.sendJson(response, 404, { error: "Not found" });
-    } catch (error) {
+    } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Internal server error";
       if (error instanceof BridgeHttpError) {
         this.sendJson(response, error.status, { error: message });

@@ -1,6 +1,10 @@
 import { constants as fsConstants } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import {
+  clearTimeout as clearNodeTimeout,
+  setTimeout as setNodeTimeout,
+} from "node:timers";
 import type { McpVaultPort } from "./ports.js";
 import { PersistentSearchCache } from "./persistent-search-cache.js";
 import {
@@ -25,7 +29,7 @@ export class VaultManager implements McpVaultPort {
   private readonly searchCache: PersistentSearchCache | null;
   private searchIndexReady = false;
   private searchIndexPromise: Promise<void> | null = null;
-  private searchCacheSaveTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
+  private searchCacheSaveTimer: ReturnType<typeof setNodeTimeout> | null = null;
 
   constructor(vaultPath: string, configDirPath?: string) {
     this.vaultPath = vaultPath;
@@ -328,9 +332,9 @@ export class VaultManager implements McpVaultPort {
 
   private scheduleSearchCacheSave(): void {
     if (this.searchCacheSaveTimer !== null) {
-      globalThis.clearTimeout(this.searchCacheSaveTimer);
+      clearNodeTimeout(this.searchCacheSaveTimer);
     }
-    this.searchCacheSaveTimer = globalThis.setTimeout(() => {
+    this.searchCacheSaveTimer = setNodeTimeout(() => {
       this.searchCacheSaveTimer = null;
       void this.searchCache?.save(this.searchIndex);
     }, 250);
