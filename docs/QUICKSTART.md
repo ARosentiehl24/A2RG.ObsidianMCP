@@ -81,9 +81,9 @@ Configure:
 HTTPS is recommended. When enabled, the plugin:
 
 1. Generates a local certificate and private key.
-2. Stores secret material outside the vault.
-3. Displays the certificate fingerprint and CA certificate path.
-4. Copies an MCP environment block through **Copy environment variables**.
+2. Stores plugin settings and the public certificate in Obsidian plugin data.
+3. Keeps the private key only in plugin process memory.
+4. Displays the certificate fingerprint.
 
 Local HTTPS is disabled by default. Enable it explicitly and keep
 `OBSIDIAN_CA_CERT` configured for the MCP server.
@@ -121,12 +121,10 @@ Rules:
   `/absolute/path/to/your/vault/.obsidian`; set it for a custom config folder.
 - `OBSIDIAN_API_URL` must use the configured loopback host and port.
 - `OBSIDIAN_API_KEY` must exactly match the plugin bearer token.
-- `OBSIDIAN_CA_CERT` must point to the plugin's generated CA certificate
-  when HTTPS is enabled.
+- `OBSIDIAN_CA_CERT` must be the plugin's generated PEM certificate or a local
+  certificate file path when HTTPS is enabled.
 - HTTP is available for local testing, but HTTPS is recommended.
 - `.env` must not be committed.
-
-You can copy the complete environment block from the plugin settings.
 
 ## 6. Register the MCP server
 

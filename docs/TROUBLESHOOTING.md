@@ -42,8 +42,8 @@ OBSIDIAN_VAULT_PATH=/absolute/path/to/your/vault
 
 ## HTTPS is enabled but the MCP server fails TLS verification
 
-When `OBSIDIAN_API_URL=https://127.0.0.1:27125`, set
-`OBSIDIAN_CA_CERT` to the exact certificate path shown in plugin settings.
+When `OBSIDIAN_API_URL=https://127.0.0.1:27125`, set `OBSIDIAN_CA_CERT` to the
+PEM certificate shown by the plugin or to an exact local certificate file path.
 
 ```dotenv
 OBSIDIAN_API_URL=https://127.0.0.1:27125
@@ -182,14 +182,9 @@ Settings are stored in:
 <vault>/.obsidian/plugins/mcp-vault-connector/data.json
 ```
 
-The bearer token and TLS private key are stored outside the vault at:
-
-```text
-~/.config/obsidian/a2rg-mcp-bridge/
-```
-
-Check that this directory is writable and private. Do not commit `data.json`
-or copy the bearer token and TLS private key into the vault.
+The bearer token and public TLS certificate are stored in Obsidian plugin data.
+The TLS private key is held only in plugin process memory. Do not commit
+`data.json` or copy the bearer token into the vault.
 
 ## Public server or HTTPS is still not working
 

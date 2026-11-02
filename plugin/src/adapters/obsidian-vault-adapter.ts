@@ -24,13 +24,8 @@ export class ObsidianVaultAdapter implements VaultPort {
   constructor(
     private readonly app: App,
     plugin: Plugin,
-    searchCachePath?: string,
   ) {
-    this.searchService = new ObsidianSearchService(
-      app,
-      plugin,
-      searchCachePath,
-    );
+    this.searchService = new ObsidianSearchService(app, plugin);
     this.graphService = new ObsidianGraphService(app, plugin);
   }
 

@@ -1,7 +1,4 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, stat } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import test from "node:test";
 import { ApiClient } from "../src/api";
 import { HttpBridge } from "../plugin/src/bridge/http-bridge";
@@ -163,46 +160,40 @@ test("HttpBridge rejects unauthorized requests and serves authenticated writes",
 });
 
 test("HttpBridge serves HTTPS and ApiClient verifies the generated certificate", async () => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "a2rg-tls-"));
+  const tls = await generateLocalTlsCertificate();
+  assert.match(tls.certificate, /BEGIN CERTIFICATE/);
+  assert.match(tls.privateKey, /BEGIN (EC )?PRIVATE KEY/);
+  const vault = new MemoryVault();
+  const bridge = new HttpBridge({
+    port: 0,
+    token: "test-token",
+    vault,
+    tls: {
+      certificate: tls.certificate,
+      privateKey: tls.privateKey,
+    },
+  });
+
+  const address = await bridge.start();
 
   try {
-    const tls = await generateLocalTlsCertificate(directory);
-    const keyMode = (await stat(tls.privateKeyPath)).mode & 0o777;
-    assert.equal(keyMode, 0o600);
-    const vault = new MemoryVault();
-    const bridge = new HttpBridge({
-      port: 0,
-      token: "test-token",
-      vault,
-      tls: {
-        certificate: tls.certificate,
-        privateKey: tls.privateKey,
-      },
-    });
+    const api = new ApiClient(
+      `https://127.0.0.1:${address.port}`,
+      "test-token",
+      3000,
+      tls.certificate,
+    );
 
-    const address = await bridge.start();
+    assert.equal(await api.isAvailable(), true);
 
-    try {
-      const api = new ApiClient(
-        `https://127.0.0.1:${address.port}`,
-        "test-token",
-        3000,
-        tls.certificatePath,
-      );
-
-      assert.equal(await api.isAvailable(), true);
-
-      const untrustedApi = new ApiClient(
-        `https://127.0.0.1:${address.port}`,
-        "test-token",
-        3000,
-        "",
-      );
-      assert.equal(await untrustedApi.isAvailable(), false);
-    } finally {
-      await bridge.stop();
-    }
+    const untrustedApi = new ApiClient(
+      `https://127.0.0.1:${address.port}`,
+      "test-token",
+      3000,
+      "",
+    );
+    assert.equal(await untrustedApi.isAvailable(), false);
   } finally {
-    await rm(directory, { recursive: true, force: true });
+    await bridge.stop();
   }
 });
