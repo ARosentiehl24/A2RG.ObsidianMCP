@@ -85,10 +85,7 @@ export class HttpTransport {
 
       request.on("error", (error: NodeJS.ErrnoException) => {
         clearNodeTimeout(timeout);
-        const code =
-          error && typeof error === "object" && "code" in error
-            ? String((error as NodeJS.ErrnoException).code ?? "")
-            : "";
+        const code = typeof error.code === "string" ? error.code : "";
         const ambiguous =
           timedOut ||
           code === "ECONNRESET" ||
@@ -140,7 +137,8 @@ export class HttpTransport {
 
           if (String(contentType).includes("application/json") && body !== "") {
             try {
-              data = JSON.parse(body) as unknown;
+              const parsed: unknown = JSON.parse(body);
+              data = parsed;
             } catch {
               data = body;
             }

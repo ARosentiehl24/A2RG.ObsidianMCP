@@ -29,7 +29,7 @@ export class VaultManager implements McpVaultPort {
   private readonly searchCache: PersistentSearchCache | null;
   private searchIndexReady = false;
   private searchIndexPromise: Promise<void> | null = null;
-  private searchCacheSaveTimer: ReturnType<typeof setNodeTimeout> | null = null;
+  private searchCacheSaveTimer: NodeJS.Timeout | null = null;
 
   constructor(vaultPath: string, configDirPath?: string) {
     this.vaultPath = vaultPath;

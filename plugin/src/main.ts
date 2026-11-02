@@ -7,6 +7,7 @@ import {
   A2rgBridgeSettingTab,
   BridgeSettings,
   DEFAULT_SETTINGS,
+  sanitizeBridgeSettings,
 } from "./settings";
 import {
   generateLocalTlsCertificate,
@@ -65,8 +66,8 @@ export default class A2rgMcpBridgePlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    const loaded = (await this.loadData()) as Partial<BridgeSettings> | null;
-    this.settings = { ...DEFAULT_SETTINGS, ...loaded, token: "" };
+    const loaded: unknown = await this.loadData();
+    this.settings = sanitizeBridgeSettings(loaded);
   }
 
   async saveSettings(): Promise<void> {
