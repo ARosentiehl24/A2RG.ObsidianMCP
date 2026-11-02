@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .codebase-memory/
+.playwright-mcp/
 main.js
 *.map
 *.log

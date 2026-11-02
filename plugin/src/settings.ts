@@ -11,9 +11,8 @@ export interface BridgeSettings {
   port: number;
   token: string;
   tlsEnabled: boolean;
-  tlsCertificatePath: string;
-  tlsPrivateKeyPath: string;
   tlsFingerprint: string;
+  tlsCertificate: string;
 }
 
 export const DEFAULT_SETTINGS: BridgeSettings = {
@@ -21,9 +20,8 @@ export const DEFAULT_SETTINGS: BridgeSettings = {
   port: 27125,
   token: "",
   tlsEnabled: false,
-  tlsCertificatePath: "",
-  tlsPrivateKeyPath: "",
   tlsFingerprint: "",
+  tlsCertificate: "",
 };
 
 export function sanitizeBridgeSettings(value: unknown): BridgeSettings {
@@ -35,9 +33,9 @@ export function sanitizeBridgeSettings(value: unknown): BridgeSettings {
   const enabled = readProperty(value, "enabled");
   const port = readProperty(value, "port");
   const tlsEnabled = readProperty(value, "tlsEnabled");
-  const tlsCertificatePath = readProperty(value, "tlsCertificatePath");
-  const tlsPrivateKeyPath = readProperty(value, "tlsPrivateKeyPath");
   const tlsFingerprint = readProperty(value, "tlsFingerprint");
+  const tlsCertificate = readProperty(value, "tlsCertificate");
+  const token = readProperty(value, "token");
 
   return {
     enabled: typeof enabled === "boolean" ? enabled : defaults.enabled,
@@ -48,21 +46,20 @@ export function sanitizeBridgeSettings(value: unknown): BridgeSettings {
       && port <= 65535
         ? port
         : defaults.port,
-    token: "",
+    token:
+      typeof token === "string" && /^[0-9a-f]{64}$/i.test(token)
+        ? token
+        : "",
     tlsEnabled:
       typeof tlsEnabled === "boolean" ? tlsEnabled : defaults.tlsEnabled,
-    tlsCertificatePath:
-      typeof tlsCertificatePath === "string"
-        ? tlsCertificatePath
-        : defaults.tlsCertificatePath,
-    tlsPrivateKeyPath:
-      typeof tlsPrivateKeyPath === "string"
-        ? tlsPrivateKeyPath
-        : defaults.tlsPrivateKeyPath,
     tlsFingerprint:
       typeof tlsFingerprint === "string"
         ? tlsFingerprint
         : defaults.tlsFingerprint,
+    tlsCertificate:
+      typeof tlsCertificate === "string"
+        ? tlsCertificate
+        : defaults.tlsCertificate,
   };
 }
 
@@ -105,12 +102,6 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
           {
             name: "Local address",
             desc: this.plugin.getBridgeUrl(),
-            action: () => {
-              void this.copyToClipboard(
-                this.plugin.getBridgeUrl(),
-                "Bridge URL",
-              );
-            },
           },
         ],
       },
@@ -168,13 +159,8 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
             },
           },
           {
-            name: "Copy bearer token",
-            action: () => {
-              void this.copyToClipboard(
-                this.plugin.settings.token,
-                "Bearer token",
-              );
-            },
+            name: "Bearer token",
+            desc: "Generated automatically and stored in Obsidian plugin data.",
           },
           {
             name: "Generate a new bearer token",
@@ -194,31 +180,6 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
               ? `SHA-256: ${this.plugin.getTlsFingerprint()}`
               : "Not generated",
             visible: () => this.plugin.isTlsEnabled(),
-            action: () => {
-              void this.copyToClipboard(
-                this.plugin.getTlsCertificatePath(),
-                "CA certificate path",
-              );
-            },
-          },
-          {
-            name: "Copy public certificate",
-            visible: () => this.plugin.isTlsEnabled(),
-            action: () => {
-              void (async () => {
-                try {
-                  const certificate = await this.plugin.readTlsCertificate();
-                  await this.copyToClipboard(
-                    certificate,
-                    "Local certificate",
-                  );
-                } catch (error: unknown) {
-                  const message =
-                    error instanceof Error ? error.message : String(error);
-                  new Notice(`Could not copy the certificate: ${message}`);
-                }
-              })();
-            },
           },
           {
             name: "Generate a replacement certificate",
@@ -238,38 +199,6 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
               })();
             },
           },
-          {
-            name: "Copy environment variables",
-            desc: "Copies the URL, bearer token, CA certificate, and bridge preferences.",
-            action: () => {
-              const environment = [
-                `OBSIDIAN_API_URL=${this.plugin.getBridgeUrl()}`,
-                `OBSIDIAN_API_KEY=${this.plugin.settings.token}`,
-                "OBSIDIAN_PREFER_REST=true",
-                "OBSIDIAN_TIMEOUT_MS=3000",
-                ...(this.plugin.getConfigDirPath()
-                  ? [`OBSIDIAN_CONFIG_DIR=${this.plugin.getConfigDirPath()}`]
-                  : []),
-                ...(this.plugin.isTlsEnabled()
-                  ? [`OBSIDIAN_CA_CERT=${this.plugin.getTlsCertificatePath()}`]
-                  : []),
-              ].join("\n");
-              void this.copyToClipboard(environment, "MCP environment");
-            },
-          },
-          {
-            name: "Health check",
-            desc: "Copy an authenticated curl command for the running bridge.",
-            action: () => {
-              const caOption =
-                this.plugin.isTlsEnabled() &&
-                this.plugin.getTlsCertificatePath()
-                  ? ` --cacert "${this.plugin.getTlsCertificatePath()}"`
-                  : "";
-              const command = `curl --fail --silent${caOption} -H "Authorization: ******" ${this.plugin.getBridgeUrl()}/health`;
-              void this.copyToClipboard(command, "Health check command");
-            },
-          },
         ],
       },
       {
@@ -278,7 +207,7 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
         items: [
           {
             name: "Local-only bridge",
-            desc: "The bridge listens only on 127.0.0.1. The bearer token and private key stay outside the vault.",
+            desc: "The bridge listens only on 127.0.0.1. The bearer token stays in Obsidian plugin data; the generated private key is held in memory.",
           },
           {
             name: "Bearer token access",
@@ -352,16 +281,5 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
         break;
     }
     this.update();
-  }
-
-  private async copyToClipboard(value: string, label: string): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(value);
-      new Notice(`${label} copied.`);
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : String(error);
-      new Notice(`Could not copy ${label}: ${message}`);
-    }
   }
 }

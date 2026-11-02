@@ -119,10 +119,10 @@ sudo chmod 644 /etc/a2rg-mcp/tls/fullchain.pem
 The exact service account and group names depend on the host.
 
 For local TLS testing, a self-signed certificate can be generated, but clients
-must explicitly trust or verify it. The plugin writes the generated certificate
-and private key outside the vault at
-`~/.config/obsidian/a2rg-mcp-bridge/tls/`. Copy
-`localhost.pem` to `OBSIDIAN_CA_CERT`; it is not intended for public HTTPS:
+must explicitly trust or verify it. The plugin stores the public certificate in
+its plugin data and keeps the private key only in process memory. Set
+`OBSIDIAN_CA_CERT` to the PEM certificate or to a local certificate file path.
+It is not intended for public HTTPS:
 
 ```bash
 openssl req -x509 -nodes -newkey rsa:2048 \

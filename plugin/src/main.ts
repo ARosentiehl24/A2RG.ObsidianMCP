@@ -1,5 +1,4 @@
-import path from "node:path";
-import { Notice, Plugin, FileSystemAdapter } from "obsidian";
+import { Notice, Plugin } from "obsidian";
 import { randomBytes } from "node:crypto";
 import { ObsidianVaultAdapter } from "./adapters/obsidian-vault-adapter";
 import { HttpBridge } from "./bridge/http-bridge";
@@ -11,23 +10,21 @@ import {
 } from "./settings";
 import {
   generateLocalTlsCertificate,
-  readLocalTlsMaterial,
   LocalTlsMaterial,
 } from "./tls/local-certificate";
-import { SecureConfigStore } from "./services/secure-config-store";
 
 export default class A2rgMcpBridgePlugin extends Plugin {
   settings: BridgeSettings = { ...DEFAULT_SETTINGS };
   private bridge: HttpBridge | null = null;
   private vaultAdapter: ObsidianVaultAdapter | null = null;
-  private readonly secureConfig = new SecureConfigStore();
+  private tlsMaterial: LocalTlsMaterial | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
-    this.settings.token = await this.secureConfig.ensureToken(
-      () => randomBytes(32).toString("hex"),
-    );
-    await this.securePluginFiles();
+    if (!/^[0-9a-f]{64}$/i.test(this.settings.token)) {
+      this.settings.token = randomBytes(32).toString("hex");
+      await this.saveData({ ...this.settings });
+    }
 
     this.addSettingTab(new A2rgBridgeSettingTab(this.app, this));
     this.addCommand({
@@ -71,14 +68,12 @@ export default class A2rgMcpBridgePlugin extends Plugin {
   }
 
   async saveSettings(): Promise<void> {
-    await this.saveData({ ...this.settings, token: "" });
-    await this.securePluginFiles();
+    await this.saveData({ ...this.settings });
     await this.restartBridge();
   }
 
   async generateToken(): Promise<void> {
     this.settings.token = randomBytes(32).toString("hex");
-    await this.secureConfig.writeToken(this.settings.token);
     await this.saveSettings();
   }
 
@@ -87,7 +82,6 @@ export default class A2rgMcpBridgePlugin extends Plugin {
     if (!/^[0-9a-f]{64}$/i.test(normalized)) {
       throw new Error("Bearer token must be 64 hexadecimal characters");
     }
-    await this.secureConfig.writeToken(normalized);
     this.settings.token = normalized;
     await this.saveSettings();
   }
@@ -105,49 +99,27 @@ export default class A2rgMcpBridgePlugin extends Plugin {
     return this.settings.tlsEnabled;
   }
 
-  getTlsCertificatePath(): string {
-    return this.settings.tlsCertificatePath;
+  getTlsCertificate(): string {
+    return this.settings.tlsCertificate;
   }
 
   getTlsFingerprint(): string {
     return this.settings.tlsFingerprint;
   }
 
-  getConfigDirPath(): string | null {
-    const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof FileSystemAdapter)) {
-      return null;
-    }
-    return path.join(
-      adapter.getBasePath(),
-      this.app.vault.configDir,
-    );
-  }
-
   async generateTlsCertificate(): Promise<void> {
-    const tlsDirectory = this.getTlsDirectory();
-    if (!tlsDirectory) {
-      throw new Error("TLS certificates require a local filesystem vault");
-    }
-
-    const material = await generateLocalTlsCertificate(tlsDirectory);
-    this.settings.tlsCertificatePath = material.certificatePath;
-    this.settings.tlsPrivateKeyPath = material.privateKeyPath;
+    const material = await generateLocalTlsCertificate();
+    this.tlsMaterial = material;
+    this.settings.tlsCertificate = material.certificate;
     this.settings.tlsFingerprint = material.fingerprint;
     await this.saveSettings();
   }
 
   async readTlsCertificate(): Promise<string> {
-    if (!this.settings.tlsCertificatePath) {
-      throw new Error("No local TLS certificate is configured");
+    if (this.settings.tlsCertificate) {
+      return this.settings.tlsCertificate;
     }
-
-    const material = await readLocalTlsMaterial(
-      this.settings.tlsCertificatePath,
-      this.settings.tlsPrivateKeyPath,
-      this.settings.tlsFingerprint,
-    );
-    return material.certificate;
+    throw new Error("No local TLS certificate is configured");
   }
 
   async startBridge(): Promise<void> {
@@ -156,19 +128,7 @@ export default class A2rgMcpBridgePlugin extends Plugin {
       return;
     }
 
-    const securityWarnings = await this.securePluginFiles();
-    if (securityWarnings.length > 0) {
-      new Notice(
-        `A2RG MCP bridge not started: insecure plugin permissions (${securityWarnings.join(", ")}).`,
-      );
-      return;
-    }
-
-    const vault = new ObsidianVaultAdapter(
-      this.app,
-      this,
-      this.getSearchCachePath() ?? undefined,
-    );
+    const vault = new ObsidianVaultAdapter(this.app, this);
     this.vaultAdapter = vault;
     vault.startIndexing();
 
@@ -223,66 +183,15 @@ export default class A2rgMcpBridgePlugin extends Plugin {
     await this.startBridge();
   }
 
-  private getSearchCachePath(): string | null {
-    const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof FileSystemAdapter)) {
-      return null;
-    }
-    if (!this.manifest.dir) {
-      return null;
-    }
-    return path.join(
-      adapter.getBasePath(),
-      this.manifest.dir,
-      "cache",
-      "search-index-v1.json",
-    );
-  }
-
-  private getTlsDirectory(): string {
-    return this.secureConfig.getTlsDirectory();
-  }
-
   private async ensureTlsMaterial(): Promise<LocalTlsMaterial> {
-    const secureDirectory = this.secureConfig.getDirectory();
-    const certificateIsSecure =
-      this.settings.tlsCertificatePath &&
-      this.secureConfig.isWithinDirectory(
-        this.settings.tlsCertificatePath,
-        secureDirectory,
-      );
-    const privateKeyIsSecure =
-      this.settings.tlsPrivateKeyPath &&
-      this.secureConfig.isWithinDirectory(
-        this.settings.tlsPrivateKeyPath,
-        secureDirectory,
-      );
-
-    if (certificateIsSecure && privateKeyIsSecure) {
-      try {
-        return await readLocalTlsMaterial(
-          this.settings.tlsCertificatePath,
-          this.settings.tlsPrivateKeyPath,
-          this.settings.tlsFingerprint,
-        );
-      } catch {
-        // Generate a replacement certificate below.
-      }
+    if (this.tlsMaterial) {
+      return this.tlsMaterial;
     }
-
-    const tlsDirectory = this.getTlsDirectory();
-    const material = await generateLocalTlsCertificate(tlsDirectory);
-    this.settings.tlsCertificatePath = material.certificatePath;
-    this.settings.tlsPrivateKeyPath = material.privateKeyPath;
+    const material = await generateLocalTlsCertificate();
+    this.tlsMaterial = material;
+    this.settings.tlsCertificate = material.certificate;
     this.settings.tlsFingerprint = material.fingerprint;
-    await this.saveData({ ...this.settings, token: "" });
-    await this.securePluginFiles();
+    await this.saveData({ ...this.settings });
     return material;
-  }
-
-  private async securePluginFiles(): Promise<string[]> {
-    return this.secureConfig.secureSecrets(
-      this.settings.tlsPrivateKeyPath,
-    );
   }
 }

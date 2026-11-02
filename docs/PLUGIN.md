@@ -4,7 +4,7 @@ This plugin is the active-Obsidian adapter for A2RG Obsidian MCP.
 
 Community plugin ID: `mcp-vault-connector`
 
-Current manifest version: `1.0.3`
+Current manifest version: `1.0.4`
 
 ## Responsibilities
 
@@ -57,37 +57,25 @@ The settings file contains non-secret state similar to:
   "enabled": true,
   "port": 27125,
   "tlsEnabled": true,
-  "tlsCertificatePath": "/absolute/path/to/localhost.pem",
-  "tlsPrivateKeyPath": "/absolute/path/to/localhost-key.pem",
-  "tlsFingerprint": "SHA-256 fingerprint"
+  "tlsFingerprint": "SHA-256 fingerprint",
+  "tlsCertificate": "-----BEGIN CERTIFICATE-----..."
 }
 ```
 
-The bearer token field is excluded from saved settings. The bearer token and
-TLS private key are stored outside the vault under:
-
-```text
-~/.config/obsidian/a2rg-mcp-bridge/
-~/.config/obsidian/a2rg-mcp-bridge/tls/
-```
-
-On macOS and Windows, the secure configuration directory follows the
-application data location used by Obsidian.
+The bearer token is stored in Obsidian plugin data. The public certificate is
+stored in plugin data for MCP configuration. The generated TLS private key is
+held only in the plugin process memory and is not persisted.
 
 The settings page provides:
 
 - Bridge start/stop status.
-- Loopback URL copy.
+- Loopback URL.
 - Enable/disable bridge toggle.
 - Local HTTPS toggle.
 - Loopback port control.
-- Bearer token copy.
-- Bearer token rotation.
-- Local certificate path, public certificate, and replacement controls.
-- MCP environment variable copy.
-- Authenticated health-check command copy.
+- Public certificate fingerprint and replacement controls.
 
-Do not commit or share `data.json`, the bearer token, or the TLS private key.
+Do not commit or share `data.json` or the bearer token.
 
 ## Port
 
@@ -100,8 +88,8 @@ Changing the port restarts the bridge. Set the matching
 ## Bearer token
 
 The token is 32 random bytes represented as 64 hexadecimal characters.
-The plugin stores it in `~/.config/obsidian/a2rg-mcp-bridge/token`, and the MCP
-server receives the same value through `OBSIDIAN_API_KEY`.
+The plugin stores it in Obsidian plugin data, and the MCP server receives the
+same value through `OBSIDIAN_API_KEY`.
 
 Rotate the token when:
 
@@ -126,8 +114,7 @@ configured CA.
 When HTTPS is enabled:
 
 - Set `OBSIDIAN_API_URL=https://127.0.0.1:<port>`.
-- Set `OBSIDIAN_CA_CERT` to the plugin's generated CA certificate path.
-- The plugin will refuse to start if required secret files are not private.
+- Set `OBSIDIAN_CA_CERT` to the plugin's PEM certificate or to a local certificate file path.
 
 HTTP is retained for local testing. It must remain loopback-only.
 

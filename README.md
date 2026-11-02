@@ -10,7 +10,7 @@ The project has two cooperating components:
 - **A2RG Obsidian MCP** runs over MCP stdio and exposes vault operations to
   MCP clients.
 
-Current release: `1.0.3`.
+Current release: `1.0.4`.
 
 ## Architecture
 
@@ -203,7 +203,7 @@ Plugin releases are automated by `.github/workflows/release.yml`.
 - Relative vault paths are validated.
 - Absolute paths and `.` / `..` path segments are rejected.
 - Request bodies are capped at 5 MB.
-- Certificate and private-key material is kept outside the vault.
+- The TLS private key is held only in process memory; plugin settings contain only the public certificate.
 - The fallback does not replace authentication for a remote service.
 
 Read [Security and Public Deployment](docs/SECURITY.md) before changing the

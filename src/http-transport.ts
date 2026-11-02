@@ -27,11 +27,14 @@ export class HttpTransport {
     private readonly baseUrl: string,
     private readonly apiKey: string,
     private readonly timeoutMs: number,
-    caCertPath: string = "",
+    caCertSource: string = "",
   ) {
-    if (caCertPath) {
+    const normalizedSource = caCertSource.trim();
+    if (normalizedSource.startsWith("-----BEGIN")) {
+      this.caCert = Buffer.from(normalizedSource, "utf-8");
+    } else if (normalizedSource) {
       try {
-        this.caCert = readFileSync(caCertPath);
+        this.caCert = readFileSync(normalizedSource);
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(`Could not read TLS CA certificate: ${message}`);
@@ -75,8 +78,8 @@ export class HttpTransport {
       let timedOut = false;
 
       const request = url.protocol === "https:"
-        ? https.request(requestOptions as https.RequestOptions, handleResponse)
-        : http.request(requestOptions as http.RequestOptions, handleResponse);
+        ? https.request(requestOptions, handleResponse)
+        : http.request(requestOptions, handleResponse);
 
       timeout = setNodeTimeout(() => {
         timedOut = true;

@@ -9,26 +9,18 @@ import {
   normalizeSearchText,
   TextSearchIndex,
 } from "../../../src/search-index";
-import { PersistentSearchCache } from "../../../src/persistent-search-cache";
 import type { VaultSearchMatch } from "../ports/vault-port";
 
 export class ObsidianSearchService {
   private readonly searchIndex = new TextSearchIndex();
-  private readonly searchCache: PersistentSearchCache | null;
   private searchIndexReady = false;
   private searchIndexPromise: Promise<void> | null = null;
-  private searchCacheSaveTimer: number | null = null;
   private readonly incomingLinkCounts = new Map<string, number>();
 
   constructor(
     private readonly app: App,
     private readonly plugin: Plugin,
-    searchCachePath?: string,
-  ) {
-    this.searchCache = searchCachePath
-      ? new PersistentSearchCache(searchCachePath)
-      : null;
-  }
+  ) {}
 
   startIndexing(): void {
     this.rebuildIncomingLinkCounts();
@@ -38,7 +30,6 @@ export class ObsidianSearchService {
           this.clearResultCache();
           this.rebuildIncomingLinkCounts();
           void this.indexFile(file);
-          this.scheduleSearchCacheSave();
         }
       }),
     );
@@ -48,7 +39,6 @@ export class ObsidianSearchService {
           this.clearResultCache();
           this.rebuildIncomingLinkCounts();
           void this.indexFile(file);
-          this.scheduleSearchCacheSave();
         }
       }),
     );
@@ -58,7 +48,6 @@ export class ObsidianSearchService {
           this.searchIndex.removeDocument(file.path);
           this.clearResultCache();
           this.rebuildIncomingLinkCounts();
-          this.scheduleSearchCacheSave();
         }
       }),
     );
@@ -70,7 +59,6 @@ export class ObsidianSearchService {
           this.rebuildIncomingLinkCounts();
           void this.indexFile(file);
         }
-        this.scheduleSearchCacheSave();
       }),
     );
     this.plugin.registerEvent(
@@ -78,7 +66,6 @@ export class ObsidianSearchService {
         this.clearResultCache();
         this.rebuildIncomingLinkCounts();
         void this.indexFile(file, data, cache);
-        this.scheduleSearchCacheSave();
       }),
     );
     this.plugin.registerEvent(
@@ -86,7 +73,6 @@ export class ObsidianSearchService {
         this.searchIndex.removeDocument(file.path);
         this.clearResultCache();
         this.rebuildIncomingLinkCounts();
-        this.scheduleSearchCacheSave();
       }),
     );
     this.plugin.registerEvent(
@@ -170,7 +156,6 @@ export class ObsidianSearchService {
       .slice(0, limit);
 
     this.searchIndex.setCachedResults(cacheKey, rankedResults);
-    this.scheduleSearchCacheSave();
     return rankedResults;
   }
 
@@ -183,11 +168,7 @@ export class ObsidianSearchService {
   }
 
   async flushSearchCache(): Promise<void> {
-    if (this.searchCacheSaveTimer !== null) {
-      window.clearTimeout(this.searchCacheSaveTimer);
-      this.searchCacheSaveTimer = null;
-    }
-    await this.saveSearchCache();
+    return Promise.resolve();
   }
 
   private async ensureSearchIndex(): Promise<void> {
@@ -205,36 +186,8 @@ export class ObsidianSearchService {
 
   private async rebuildSearchIndex(): Promise<void> {
     this.searchIndex.clear();
-    await this.loadSearchCache();
-
-    const files = this.app.vault.getMarkdownFiles();
-    const currentPaths = new Set<string>();
-
-    for (let offset = 0; offset < files.length; offset += 50) {
-      const chunk = files.slice(offset, offset + 50);
-      await Promise.all(
-        chunk.map(async (file) => {
-          currentPaths.add(file.path);
-          const indexed = this.searchIndex.getDocument(file.path);
-          if (
-            indexed?.mtimeMs === file.stat.mtime &&
-            indexed.sizeBytes === file.stat.size
-          ) {
-            return;
-          }
-          await this.indexFile(file);
-        }),
-      );
-    }
-
-    for (const stalePath of this.searchIndex.getDocumentPaths()) {
-      if (!currentPaths.has(stalePath)) {
-        this.searchIndex.removeDocument(stalePath);
-      }
-    }
-
     this.searchIndexReady = true;
-    await this.saveSearchCache();
+    await this.indexKnownFiles();
   }
 
   private async indexFile(
@@ -283,6 +236,32 @@ export class ObsidianSearchService {
       : content;
   }
 
+  private async indexKnownFiles(): Promise<void> {
+    const paths = new Set<string>();
+    const activeFile = this.app.workspace.getActiveFile();
+    if (activeFile instanceof TFile) {
+      paths.add(activeFile.path);
+    }
+
+    for (const [sourcePath, targets] of Object.entries(
+      this.app.metadataCache.resolvedLinks,
+    )) {
+      paths.add(sourcePath);
+      for (const targetPath of Object.keys(targets)) {
+        paths.add(targetPath);
+      }
+    }
+
+    await Promise.all(
+      Array.from(paths).map(async (filePath) => {
+        const file = this.app.vault.getAbstractFileByPath(filePath);
+        if (file instanceof TFile && this.isSearchableFile(file)) {
+          await this.indexFile(file);
+        }
+      }),
+    );
+  }
+
   private countIncomingLinks(filePath: string): number {
     return this.incomingLinkCounts.get(filePath) ?? 0;
   }
@@ -303,30 +282,5 @@ export class ObsidianSearchService {
 
   private isSearchableFile(file: TFile): boolean {
     return file.extension.toLowerCase() === "md";
-  }
-
-  private async loadSearchCache(): Promise<void> {
-    if (this.searchCache) {
-      await this.searchCache.load(this.searchIndex);
-    }
-  }
-
-  private async saveSearchCache(): Promise<void> {
-    if (this.searchCache) {
-      await this.searchCache.save(this.searchIndex);
-    }
-  }
-
-  private scheduleSearchCacheSave(): void {
-    if (!this.searchCache) {
-      return;
-    }
-    if (this.searchCacheSaveTimer !== null) {
-      window.clearTimeout(this.searchCacheSaveTimer);
-    }
-    this.searchCacheSaveTimer = window.setTimeout(() => {
-      this.searchCacheSaveTimer = null;
-      void this.saveSearchCache();
-    }, 250);
   }
 }
