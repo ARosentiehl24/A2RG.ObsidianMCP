@@ -19,9 +19,8 @@ export function loadConfig(): Config {
   }
 
   const vaultPath = process.env.OBSIDIAN_VAULT_PATH || "/home/a2rg/OneDrive/Obsidian Vault";
-  const configDirPath =
-    process.env.OBSIDIAN_CONFIG_DIR || path.join(vaultPath, ".obsidian");
-  if (!path.isAbsolute(configDirPath)) {
+  const configDirPath = process.env.OBSIDIAN_CONFIG_DIR || "";
+  if (configDirPath !== "" && !path.isAbsolute(configDirPath)) {
     throw new Error("OBSIDIAN_CONFIG_DIR must be an absolute directory path");
   }
   const apiUrl = process.env.OBSIDIAN_API_URL || "http://127.0.0.1:27125";

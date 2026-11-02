@@ -162,9 +162,7 @@ export class TextSearchIndex {
     });
 
     while (this.resultCache.size > 128) {
-      const oldestKey = this.resultCache.keys().next().value as
-        | string
-        | undefined;
+      const oldestKey = this.resultCache.keys().next().value;
       if (oldestKey === undefined) {
         break;
       }

@@ -67,20 +67,20 @@ export class HttpTransport {
           : {}),
       };
 
-      let timeout: NodeJS.Timeout;
+      let timeout: ReturnType<typeof globalThis.setTimeout>;
       let timedOut = false;
 
       const request = url.protocol === "https:"
         ? https.request(requestOptions as https.RequestOptions, handleResponse)
         : http.request(requestOptions as http.RequestOptions, handleResponse);
 
-      timeout = setTimeout(() => {
+      timeout = globalThis.setTimeout(() => {
         timedOut = true;
         request.destroy(new Error("Request timeout"));
       }, this.timeoutMs);
 
-      request.on("error", (error) => {
-        clearTimeout(timeout);
+      request.on("error", (error: NodeJS.ErrnoException) => {
+        globalThis.clearTimeout(timeout);
         const code =
           error && typeof error === "object" && "code" in error
             ? String((error as NodeJS.ErrnoException).code ?? "")
@@ -113,7 +113,7 @@ export class HttpTransport {
           bodyBytes += Buffer.byteLength(chunk);
           if (bodyBytes > maxResponseBytes) {
             rejectedForSize = true;
-            clearTimeout(timeout);
+            globalThis.clearTimeout(timeout);
             response.destroy();
             resolve({
               ok: false,
@@ -130,7 +130,7 @@ export class HttpTransport {
           if (rejectedForSize) {
             return;
           }
-          clearTimeout(timeout);
+          globalThis.clearTimeout(timeout);
           const contentType = response.headers["content-type"] ?? "";
           let data: unknown = body;
 

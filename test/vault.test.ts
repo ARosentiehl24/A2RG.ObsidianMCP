@@ -165,9 +165,10 @@ test("Search matching lines are capped in cache results", () => {
 
 test("VaultManager persists and reloads the search snapshot", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "a2rg-persistent-index-"));
+  const configDir = path.join(directory, ".obsidian");
 
   try {
-    const vault = new VaultManager(directory);
+    const vault = new VaultManager(directory, configDir);
     await vault.writeFile("notes/cache.md", "Persistent cache marker");
     assert.deepEqual(
       (await vault.searchFiles("persistent cache")).map((match) => match.path),
@@ -175,8 +176,7 @@ test("VaultManager persists and reloads the search snapshot", async () => {
     );
 
     const cachePath = path.join(
-      directory,
-      ".obsidian",
+      configDir,
       "plugins",
       "mcp-vault-connector",
       "cache",
@@ -187,7 +187,7 @@ test("VaultManager persists and reloads the search snapshot", async () => {
     assert.equal(snapshot.version, 1);
     assert.ok(Array.isArray(snapshot.documents));
 
-    const reloaded = new VaultManager(directory);
+    const reloaded = new VaultManager(directory, configDir);
     assert.deepEqual(
       (await reloaded.searchFiles("persistent cache")).map((match) => match.path),
       ["notes/cache.md"],

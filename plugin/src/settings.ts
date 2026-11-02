@@ -1,4 +1,10 @@
-import { App, Notice, PluginSettingTab, Setting } from "obsidian";
+import {
+  App,
+  Notice,
+  PluginSettingTab,
+  Setting,
+  type SettingDefinitionItem,
+} from "obsidian";
 import type A2rgMcpBridgePlugin from "./main";
 
 export interface BridgeSettings {
@@ -29,13 +35,201 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
     super(app, plugin);
   }
 
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    const running = this.plugin.isBridgeRunning();
+
+    return [
+      {
+        type: "group",
+        heading: "Status",
+        items: [
+          {
+            name: running ? "Bridge is running" : "Bridge is stopped",
+            desc: running
+              ? `Listening locally on ${this.plugin.getBridgeUrl()}`
+              : "Start the bridge to accept MCP requests.",
+            action: () => {
+              void (async () => {
+                if (running) {
+                  await this.plugin.stopBridge();
+                } else {
+                  await this.plugin.startBridge();
+                }
+                this.update();
+              })();
+            },
+          },
+          {
+            name: "Local address",
+            desc: this.plugin.getBridgeUrl(),
+            action: () => {
+              void this.copyToClipboard(
+                this.plugin.getBridgeUrl(),
+                "Bridge URL",
+              );
+            },
+          },
+        ],
+      },
+      {
+        type: "group",
+        heading: "Connection",
+        items: [
+          {
+            name: "Enable bridge",
+            desc: "Start the local HTTP or HTTPS bridge while Obsidian is running.",
+            control: {
+              type: "toggle",
+              key: "enabled",
+              defaultValue: false,
+            },
+          },
+          {
+            name: "Use local HTTPS",
+            desc: "Generate a certificate and serve HTTPS on loopback.",
+            control: {
+              type: "toggle",
+              key: "tlsEnabled",
+              defaultValue: false,
+            },
+          },
+          {
+            name: "Port",
+            desc: "Loopback port. Default: 27125.",
+            control: {
+              type: "number",
+              key: "port",
+              defaultValue: 27125,
+              min: 1,
+              max: 65535,
+            },
+          },
+        ],
+      },
+      {
+        type: "group",
+        heading: "Authentication",
+        items: [
+          {
+            name: "Bearer token",
+            desc: "Copy this value to OBSIDIAN_API_KEY in the MCP environment.",
+            control: {
+              type: "text",
+              key: "token",
+              defaultValue: "",
+              placeholder: "Generated automatically",
+              validate: (value: string) =>
+                /^[0-9a-f]{64}$/i.test(value.trim())
+                  ? undefined
+                  : "Bearer token must be 64 hexadecimal characters",
+            },
+          },
+          {
+            name: "Generate a new bearer token",
+            action: () => {
+              void this.plugin.generateToken().then(() => this.update());
+            },
+          },
+        ],
+      },
+      {
+        type: "group",
+        heading: "MCP setup",
+        items: [
+          {
+            name: "Copy environment variables",
+            desc: "Copies the URL, bearer token, CA certificate, and bridge preferences.",
+            action: () => {
+              const environment = [
+                `OBSIDIAN_API_URL=${this.plugin.getBridgeUrl()}`,
+                `OBSIDIAN_API_KEY=${this.plugin.settings.token}`,
+                "OBSIDIAN_PREFER_REST=true",
+                "OBSIDIAN_TIMEOUT_MS=3000",
+                ...(this.plugin.getConfigDirPath()
+                  ? [`OBSIDIAN_CONFIG_DIR=${this.plugin.getConfigDirPath()}`]
+                  : []),
+                ...(this.plugin.isTlsEnabled()
+                  ? [`OBSIDIAN_CA_CERT=${this.plugin.getTlsCertificatePath()}`]
+                  : []),
+              ].join("\n");
+              void this.copyToClipboard(environment, "MCP environment");
+            },
+          },
+          {
+            name: "Health check",
+            desc: "Copy an authenticated curl command for the running bridge.",
+            action: () => {
+              const caOption =
+                this.plugin.isTlsEnabled() &&
+                this.plugin.getTlsCertificatePath()
+                  ? ` --cacert "${this.plugin.getTlsCertificatePath()}"`
+                  : "";
+              const command = `curl --fail --silent${caOption} -H "Authorization: ******" ${this.plugin.getBridgeUrl()}/health`;
+              void this.copyToClipboard(command, "Health check command");
+            },
+          },
+        ],
+      },
+    ];
+  }
+
+  getControlValue(key: string): unknown {
+    switch (key) {
+      case "enabled":
+        return this.plugin.settings.enabled;
+      case "tlsEnabled":
+        return this.plugin.settings.tlsEnabled;
+      case "port":
+        return this.plugin.settings.port;
+      case "token":
+        return this.plugin.settings.token;
+      default:
+        return undefined;
+    }
+  }
+
+  async setControlValue(key: string, value: unknown): Promise<void> {
+    switch (key) {
+      case "enabled":
+        if (typeof value === "boolean") {
+          this.plugin.settings.enabled = value;
+          await this.plugin.saveSettings();
+        }
+        break;
+      case "tlsEnabled":
+        if (typeof value === "boolean") {
+          this.plugin.settings.tlsEnabled = value;
+          if (value) {
+            await this.plugin.generateTlsCertificate();
+          } else {
+            await this.plugin.saveSettings();
+          }
+        }
+        break;
+      case "port":
+        if (
+          typeof value === "number" &&
+          Number.isInteger(value) &&
+          value >= 1 &&
+          value <= 65535
+        ) {
+          this.plugin.settings.port = value;
+          await this.plugin.saveSettings();
+        }
+        break;
+      case "token":
+        if (typeof value === "string") {
+          await this.plugin.setToken(value);
+        }
+        break;
+    }
+    this.update();
+  }
+
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
 
-    new Setting(containerEl)
-      .setName("A2RG MCP Bridge")
-      .setHeading();
     containerEl.createEl("p", {
       text: "Connect MCP clients to the currently open Obsidian vault.",
     });
@@ -220,7 +414,7 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
             .setTooltip("Generate a replacement certificate")
             .onClick(async () => {
               await this.plugin.generateTlsCertificate();
-              this.display();
+              this.update();
             }),
         );
     }
@@ -238,6 +432,9 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
               `OBSIDIAN_API_KEY=${this.plugin.settings.token}`,
               "OBSIDIAN_PREFER_REST=true",
               "OBSIDIAN_TIMEOUT_MS=3000",
+              ...(this.plugin.getConfigDirPath()
+                ? [`OBSIDIAN_CONFIG_DIR=${this.plugin.getConfigDirPath()}`]
+                : []),
               ...(this.plugin.isTlsEnabled()
                 ? [
                     `OBSIDIAN_CA_CERT=${this.plugin.getTlsCertificatePath()}`,

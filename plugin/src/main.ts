@@ -112,6 +112,17 @@ export default class A2rgMcpBridgePlugin extends Plugin {
     return this.settings.tlsFingerprint;
   }
 
+  getConfigDirPath(): string | null {
+    const adapter = this.app.vault.adapter;
+    if (!(adapter instanceof FileSystemAdapter)) {
+      return null;
+    }
+    return path.join(
+      adapter.getBasePath(),
+      this.app.vault.configDir,
+    );
+  }
+
   async generateTlsCertificate(): Promise<void> {
     const tlsDirectory = this.getTlsDirectory();
     if (!tlsDirectory) {

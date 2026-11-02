@@ -240,9 +240,7 @@ export class HttpBridge {
             payloadHash,
           });
           while (this.appendOperations.size > 1000) {
-            const oldestKey = this.appendOperations.keys().next().value as
-              | string
-              | undefined;
+            const oldestKey = this.appendOperations.keys().next().value;
             if (!oldestKey) {
               break;
             }
@@ -350,7 +348,7 @@ export class HttpBridge {
         chunks.push(buffer);
       });
       request.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
-      request.on("error", reject);
+      request.on("error", (error: Error) => reject(error));
     });
   }
 

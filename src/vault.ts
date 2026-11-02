@@ -22,23 +22,25 @@ export class VaultManager implements McpVaultPort {
   private readonly vaultPath: string;
   private readonly pathResolver: VaultPathResolver;
   private readonly searchIndex = new TextSearchIndex();
-  private readonly searchCache: PersistentSearchCache;
+  private readonly searchCache: PersistentSearchCache | null;
   private searchIndexReady = false;
   private searchIndexPromise: Promise<void> | null = null;
-  private searchCacheSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private searchCacheSaveTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 
   constructor(vaultPath: string, configDirPath?: string) {
     this.vaultPath = vaultPath;
     this.pathResolver = new VaultPathResolver(vaultPath);
-    this.searchCache = new PersistentSearchCache(
-      path.join(
-        configDirPath || path.join(vaultPath, ".obsidian"),
-        "plugins",
-        "mcp-vault-connector",
-        "cache",
-        "search-index-v1.json",
-      ),
-    );
+    this.searchCache = configDirPath
+      ? new PersistentSearchCache(
+          path.join(
+            configDirPath,
+            "plugins",
+            "mcp-vault-connector",
+            "cache",
+            "search-index-v1.json",
+          ),
+        )
+      : null;
   }
 
   private resolvePath(relativePath: string, allowRoot = false): Promise<string> {
@@ -225,7 +227,7 @@ export class VaultManager implements McpVaultPort {
 
   private async rebuildSearchIndex(): Promise<void> {
     this.searchIndex.clear();
-    await this.searchCache.load(this.searchIndex);
+    await this.searchCache?.load(this.searchIndex);
     const currentPaths = new Set<string>();
 
     await this.indexDirectory(this.vaultPath, currentPaths);
@@ -237,7 +239,7 @@ export class VaultManager implements McpVaultPort {
     }
 
     this.searchIndexReady = true;
-    await this.searchCache.save(this.searchIndex);
+    await this.searchCache?.save(this.searchIndex);
   }
 
   private async indexDirectory(
@@ -326,11 +328,11 @@ export class VaultManager implements McpVaultPort {
 
   private scheduleSearchCacheSave(): void {
     if (this.searchCacheSaveTimer !== null) {
-      clearTimeout(this.searchCacheSaveTimer);
+      globalThis.clearTimeout(this.searchCacheSaveTimer);
     }
-    this.searchCacheSaveTimer = setTimeout(() => {
+    this.searchCacheSaveTimer = globalThis.setTimeout(() => {
       this.searchCacheSaveTimer = null;
-      void this.searchCache.save(this.searchIndex);
+      void this.searchCache?.save(this.searchIndex);
     }, 250);
   }
 }

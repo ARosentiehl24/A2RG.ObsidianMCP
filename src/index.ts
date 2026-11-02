@@ -1,4 +1,4 @@
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
@@ -21,7 +21,7 @@ const vault = new VaultManager(config.vaultPath, config.configDirPath);
 const router = new HybridRouter(api, vault, config.preferRestApi);
 const toolRegistry = new McpToolRegistry(router);
 
-const server = new Server(
+const server = new McpServer(
   {
     name: "a2rg-obsidian-mcp",
     version: "1.0.1",
@@ -33,11 +33,11 @@ const server = new Server(
   },
 );
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
+server.server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: toolRegistry.listTools(),
 }));
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+server.server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     return await toolRegistry.callTool(
       request.params.name,
