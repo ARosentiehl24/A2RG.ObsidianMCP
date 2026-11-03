@@ -68,7 +68,7 @@ The package discovers configuration in this order:
 1. CLI flags.
 2. Environment variables.
 3. The open vault in Obsidian's `obsidian.json`.
-4. `<vault>/.obsidian/plugins/mcp-vault-connector/data.json`.
+4. The plugin settings stored in the vault's configured Obsidian config folder.
 
 This means normal package usage needs no token, vault path, or port variables.
 The package reads:

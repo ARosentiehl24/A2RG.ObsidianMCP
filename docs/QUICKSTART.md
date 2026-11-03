@@ -3,7 +3,7 @@
 This guide configures Streamable HTTP MCP first. The stdio executable is only
 an optional fallback.
 
-Current release: `1.0.7`.
+Current release: `1.0.8`.
 
 ## 1. Requirements
 
@@ -166,7 +166,7 @@ Fallback environment:
 
 ```dotenv
 OBSIDIAN_VAULT_PATH=/absolute/path/to/your/vault
-OBSIDIAN_CONFIG_DIR=/absolute/path/to/your/vault/.obsidian
+OBSIDIAN_CONFIG_DIR=/absolute/path/to/your/vault/<Obsidian-config-folder>
 OBSIDIAN_API_URL=http://127.0.0.1:27125
 OBSIDIAN_API_KEY=<64-character-plugin-token>
 OBSIDIAN_PREFER_REST=true

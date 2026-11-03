@@ -189,3 +189,78 @@ test("loadConfig discovers a vault and its Obsidian plugin settings", () => {
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("loadConfig discovers plugin settings from a custom Obsidian config folder", () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "a2rg-custom-config-"));
+  const vaultPath = path.join(directory, "My Vault");
+  const appConfigDir = path.join(directory, "obsidian");
+  const customConfigDir = "custom-obsidian";
+  const pluginDir = path.join(
+    vaultPath,
+    customConfigDir,
+    "plugins",
+    "mcp-vault-connector",
+  );
+
+  fs.mkdirSync(pluginDir, { recursive: true });
+  fs.mkdirSync(appConfigDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(appConfigDir, "obsidian.json"),
+    JSON.stringify({
+      vaults: {
+        "test-vault": {
+          path: vaultPath,
+          open: true,
+        },
+      },
+    }),
+  );
+
+  const token = "b".repeat(64);
+  fs.writeFileSync(
+    path.join(pluginDir, "data.json"),
+    JSON.stringify({
+      enabled: true,
+      port: 27125,
+      token,
+      configDir: customConfigDir,
+    }),
+  );
+
+  const keys = [
+    "OBSIDIAN_APP_CONFIG_DIR",
+    "OBSIDIAN_VAULT_PATH",
+    "OBSIDIAN_CONFIG_DIR",
+  ] as const;
+  const previous = new Map(keys.map((key) => [key, process.env[key]]));
+
+  try {
+    for (const key of keys) {
+      process.env[key] = "";
+    }
+    process.env.OBSIDIAN_APP_CONFIG_DIR = appConfigDir;
+
+    const settings = readObsidianPluginSettings(vaultPath);
+    assert.equal(settings?.token, token);
+    assert.equal(settings?.configDir, customConfigDir);
+    assert.equal(
+      settings?.configDirPath,
+      path.join(vaultPath, customConfigDir),
+    );
+
+    const config = loadConfig();
+    assert.equal(
+      config.configDirPath,
+      path.join(vaultPath, customConfigDir),
+    );
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});

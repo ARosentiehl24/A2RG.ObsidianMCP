@@ -13,6 +13,7 @@ export interface BridgeSettings {
   tlsEnabled: boolean;
   tlsFingerprint: string;
   tlsCertificate: string;
+  configDir: string;
 }
 
 export const DEFAULT_SETTINGS: BridgeSettings = {
@@ -22,6 +23,7 @@ export const DEFAULT_SETTINGS: BridgeSettings = {
   tlsEnabled: false,
   tlsFingerprint: "",
   tlsCertificate: "",
+  configDir: "",
 };
 
 export function sanitizeBridgeSettings(value: unknown): BridgeSettings {
@@ -36,6 +38,7 @@ export function sanitizeBridgeSettings(value: unknown): BridgeSettings {
   const tlsFingerprint = readProperty(value, "tlsFingerprint");
   const tlsCertificate = readProperty(value, "tlsCertificate");
   const token = readProperty(value, "token");
+  const configDir = readProperty(value, "configDir");
 
   return {
     enabled: typeof enabled === "boolean" ? enabled : defaults.enabled,
@@ -60,6 +63,10 @@ export function sanitizeBridgeSettings(value: unknown): BridgeSettings {
       typeof tlsCertificate === "string"
         ? tlsCertificate
         : defaults.tlsCertificate,
+    configDir:
+      typeof configDir === "string"
+        ? configDir
+        : defaults.configDir,
   };
 }
 
