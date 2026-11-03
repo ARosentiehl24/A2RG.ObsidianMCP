@@ -19,7 +19,7 @@ export interface FileItem {
   name: string;
   isDirectory: boolean;
   size?: number;
-  mtime?: Date;
+  mtime?: number;
 }
 
 export class VaultManager implements McpVaultPort {
@@ -139,7 +139,7 @@ export class VaultManager implements McpVaultPort {
         name: entry.name,
         isDirectory: entry.isDirectory(),
         size: stats?.size,
-        mtime: stats?.mtime,
+        mtime: stats?.mtimeMs,
       });
     }
 

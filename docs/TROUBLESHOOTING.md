@@ -1,6 +1,19 @@
 # Troubleshooting
 
-## Check the bridge
+## Check HTTP or HTTPS MCP
+
+Verify the MCP endpoint, not only the REST health endpoint:
+
+```bash
+curl --fail --silent \
+  -H "Authorization: Bearer <64-character-plugin-token>" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"manual-check","version":"1.0"}}}' \
+  http://127.0.0.1:27125/mcp
+```
+
+## REST health
 
 ```bash
 export OBSIDIAN_API_KEY='<paste-the-plugin-bearer-token>'
@@ -22,7 +35,8 @@ Possible causes:
 - Obsidian is closed.
 - The plugin is disabled.
 - The plugin failed to start.
-- `OBSIDIAN_API_URL` uses the wrong port.
+- The HTTP MCP URL uses the wrong port.
+- The HTTPS certificate is not trusted.
 - A firewall or local network policy blocks loopback access.
 
 Check:
@@ -42,8 +56,9 @@ OBSIDIAN_VAULT_PATH=/absolute/path/to/your/vault
 
 ## HTTPS is enabled but the MCP server fails TLS verification
 
-When `OBSIDIAN_API_URL=https://127.0.0.1:27125`, set `OBSIDIAN_CA_CERT` to the
-PEM certificate shown by the plugin or to an exact local certificate file path.
+For HTTPS MCP, configure the client to trust the PEM certificate shown by the
+plugin. For the optional stdio REST client, set `OBSIDIAN_CA_CERT` to that PEM
+certificate or to an exact local certificate file path.
 
 ```dotenv
 OBSIDIAN_API_URL=https://127.0.0.1:27125
@@ -56,14 +71,15 @@ loopback setup and is not for a public HTTPS server.
 
 ## HTTP `401 Unauthorized`
 
-The bearer token differs between plugin and MCP environment.
+The bearer token differs between plugin and MCP configuration.
 
 Check:
 
 1. Open the plugin settings.
 2. Copy the current token.
-3. Set the exact same value in `OBSIDIAN_API_KEY`.
-4. Restart MCP clients.
+3. In HTTP/HTTPS MCP configuration, send `Authorization: Bearer <token>`.
+4. For stdio mode, set `OBSIDIAN_API_KEY` to the exact same value.
+5. Restart MCP clients.
 
 The plugin supports token rotation. Any process that caches the old token must
 be restarted.
@@ -89,15 +105,24 @@ The bridge binds only to `127.0.0.1`.
 
 ## MCP tools do not appear
 
+For HTTP or HTTPS MCP:
+
 Check:
+
+1. The client supports Streamable HTTP MCP.
+2. The URL ends in `/mcp`.
+3. The bearer header is included.
+4. Obsidian and the plugin bridge are running.
+5. The MCP client was restarted.
+
+For stdio fallback, verify the executable separately:
 
 1. `npm run build` completed successfully.
 2. `dist/a2rg-obsidian-mcp` exists.
 3. The MCP entry path is absolute.
-4. The MCP client was restarted.
-5. The server is not disabled in client configuration.
+4. The server is not disabled in client configuration.
 
-Test the server directly:
+Test the stdio server directly:
 
 ```bash
 /absolute/path/to/A2RG.ObsidianMCP/dist/a2rg-obsidian-mcp
@@ -188,7 +213,7 @@ The TLS private key is held only in plugin process memory. Do not commit
 
 ## Public server or HTTPS is still not working
 
-This project is not a public HTTPS server. It does not implement public MCP
-authentication, OAuth, certificate loading, or reverse proxy termination.
+The plugin server is loopback-only and is not a public HTTPS or public MCP
+server. Do not publish its port or REST endpoints.
 
 See [Security and Public Deployment](SECURITY.md).

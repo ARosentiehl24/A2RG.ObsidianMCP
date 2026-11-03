@@ -1,17 +1,10 @@
 {
   "mcpServers": {
     "obsidian": {
-      "type": "stdio",
-      "command": "/absolute/path/to/A2RG.ObsidianMCP/dist/a2rg-obsidian-mcp",
-      "args": [],
-      "env": {
-        "OBSIDIAN_API_URL": "https://127.0.0.1:27125",
-        "OBSIDIAN_VAULT_PATH": "/absolute/path/to/your/vault",
-        "OBSIDIAN_CONFIG_DIR": "/absolute/path/to/your/vault/.obsidian",
-        "OBSIDIAN_API_KEY": "replace-with-the-plugin-bearer-token",
-        "OBSIDIAN_PREFER_REST": "true",
-        "OBSIDIAN_TIMEOUT_MS": "3000",
-        "OBSIDIAN_CA_CERT": "/absolute/path/to/localhost.pem"
+      "type": "http",
+      "url": "https://127.0.0.1:27125/mcp",
+      "headers": {
+        "Authorization": "Bearer ${OBSIDIAN_MCP_TOKEN}"
       }
     }
   }

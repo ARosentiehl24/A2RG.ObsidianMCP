@@ -1,190 +1,92 @@
 # Quick Start
 
-This guide configures the Obsidian plugin and the Bun MCP server end to end.
+This guide configures Streamable HTTP MCP first. The stdio executable is optional.
 
 ## 1. Requirements
 
 - Obsidian Desktop 1.14.4 or later.
-- Bun 1.4 or later.
-- Node.js 22 or later for plugin builds.
+- Node.js 22 or later.
 - npm.
-- An absolute path to an existing Obsidian vault.
-- An MCP desktop client that supports stdio servers.
+- An MCP client that supports Streamable HTTP.
+- A local Markdown vault.
 
-Check the tools:
-
-```bash
-bun --version
-node --version
-npm --version
-```
-
-## 2. Build the project
-
-From the repository root:
+## 2. Build and install
 
 ```bash
 npm install
 npm run build
 ```
 
-The build creates:
-
-```text
-dist/a2rg-obsidian-mcp
-main.js
-manifest.json
-```
-
-`dist/a2rg-obsidian-mcp` is the native Bun executable used by MCP clients.
-`main.js` and `manifest.json` are the plugin release files.
-
-## 3. Install the plugin
-
-Create the community-plugin folder:
+Copy `manifest.json` and `main.js` into:
 
 ```text
 <vault>/.obsidian/plugins/mcp-vault-connector/
 ```
 
-Copy both plugin files:
-
-```text
-manifest.json
-main.js
-```
-
-Example:
-
-```bash
-VAULT='/absolute/path/to/your/vault'
-mkdir -p "$VAULT/.obsidian/plugins/mcp-vault-connector"
-cp manifest.json main.js "$VAULT/.obsidian/plugins/mcp-vault-connector/"
-```
-
 Restart Obsidian or reload Community Plugins, then enable
 **A2RG MCP Bridge**.
 
-## 4. Configure the plugin
+## 3. Configure the plugin
 
 Open **Settings → Community Plugins → A2RG MCP Bridge**.
 
-Configure:
-
 | Setting | Recommended value |
-|---|---:|
+|---|---|
 | Enable bridge | Enabled |
 | Port | `27125` |
-| Use local HTTPS | Enabled |
-| Bearer token | Automatically generated |
+| Use local HTTPS | Disabled for the simplest HTTP setup |
+| Bearer token | Copy or generate |
 
-HTTPS is recommended. When enabled, the plugin:
+The plugin displays the endpoint:
 
-1. Generates a local certificate and private key.
-2. Stores plugin settings and the public certificate in Obsidian plugin data.
-3. Keeps the private key only in plugin process memory.
-4. Displays the certificate fingerprint.
-
-Local HTTPS is disabled by default. Enable it explicitly and keep
-`OBSIDIAN_CA_CERT` configured for the MCP server.
-
-The bearer token is a secret. Do not publish it in screenshots, logs, notes,
-source control, or public documentation.
-
-Use **Generate a new token** only when rotation is required.
-
-## 5. Configure the MCP server
-
-Create the local environment file:
-
-```bash
-cp .env.example .env
+```text
+http://127.0.0.1:27125/mcp
 ```
 
-Set the HTTPS values:
+Use HTTPS instead only if the MCP client can trust the plugin's generated
+local certificate.
 
-```dotenv
-OBSIDIAN_VAULT_PATH=/absolute/path/to/your/vault
-OBSIDIAN_API_URL=https://127.0.0.1:27125
-OBSIDIAN_API_KEY=replace-with-the-plugin-bearer-token
-OBSIDIAN_PREFER_REST=true
-OBSIDIAN_TIMEOUT_MS=3000
-OBSIDIAN_CONFIG_DIR=/absolute/path/to/your/vault/.obsidian
-OBSIDIAN_CA_CERT=/absolute/path/to/localhost.pem
-```
+## 4. Configure the MCP client
 
-Rules:
-
-- `OBSIDIAN_VAULT_PATH` must be an absolute directory path.
-- `OBSIDIAN_CONFIG_DIR` is optional and must be an absolute path to the
-  vault's Obsidian configuration folder. Its default is
-  `/absolute/path/to/your/vault/.obsidian`; set it for a custom config folder.
-- `OBSIDIAN_API_URL` must use the configured loopback host and port.
-- `OBSIDIAN_API_KEY` must exactly match the plugin bearer token.
-- `OBSIDIAN_CA_CERT` must be the plugin's generated PEM certificate or a local
-  certificate file path when HTTPS is enabled.
-- HTTP is available for local testing, but HTTPS is recommended.
-- `.env` must not be committed.
-
-## 6. Register the MCP server
-
-The repository includes `.mcp.json` as a local stdio configuration example:
+Example HTTP MCP entry:
 
 ```json
 {
   "mcpServers": {
     "obsidian": {
-      "type": "stdio",
-      "command": "/absolute/path/to/A2RG.ObsidianMCP/dist/a2rg-obsidian-mcp",
-      "args": []
+      "type": "http",
+      "url": "http://127.0.0.1:27125/mcp",
+      "headers": {
+        "Authorization": "Bearer replace-with-the-plugin-bearer-token"
+      }
     }
   }
 }
 ```
 
-Replace the repository path with an absolute path on your machine. Some MCP
-clients inherit `.env` from the MCP process working directory; others require
-the environment variables to be written in their MCP configuration.
+The provider does not need a `command`, executable path, vault path,
+`OBSIDIAN_API_KEY`, `OBSIDIAN_VAULT_PATH`, or `OBSIDIAN_CONFIG_DIR`.
 
-Restart or reload the MCP client after changing configuration.
+The bearer token is the only secret configured in the provider. It is generated
+by the plugin and grants read/write access to the open vault.
 
-## 7. Verify the bridge
+For HTTPS, use `https://127.0.0.1:27125/mcp` and configure the MCP client to
+trust the plugin certificate.
 
-Copy the bearer token from plugin settings:
+## 5. Verify HTTP MCP
 
-```bash
-export OBSIDIAN_API_KEY='<paste-the-plugin-bearer-token>'
-```
-
-For HTTPS:
+Initialize and list tools:
 
 ```bash
 curl --fail --silent \
-  --cacert /absolute/path/to/localhost.pem \
-  -H "Authorization: Bearer $OBSIDIAN_API_KEY" \
-  https://127.0.0.1:27125/health
+  -H "Authorization: Bearer <paste-the-plugin-bearer-token>" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
+  http://127.0.0.1:27125/mcp
 ```
 
-For HTTP local testing:
-
-```bash
-curl --fail --silent \
-  -H "Authorization: Bearer $OBSIDIAN_API_KEY" \
-  http://127.0.0.1:27125/health
-```
-
-Expected response:
-
-```json
-{"status":"ok"}
-```
-
-Without a valid bearer token, the endpoint returns `401 Unauthorized`.
-
-## 8. Verify the MCP server
-
-List tools and call `list_files` through an MCP stdio client. A successful
-server exposes:
+A working bridge exposes:
 
 ```text
 get_file
@@ -197,16 +99,41 @@ list_files
 get_active_file
 ```
 
-Call `list_files` with an empty directory to list the vault root.
+## 6. Optional stdio fallback
 
-## 9. Verify filesystem fallback
+The stdio executable is useful only when Obsidian is closed or HTTP is
+unavailable:
 
-Stop Obsidian or disable the bridge, keep `OBSIDIAN_VAULT_PATH` configured,
-and call a read, search, list, write, append, or delete tool.
+```text
+dist/a2rg-obsidian-mcp
+```
 
-The fallback should use the physical vault. `get_active_file` has no
-filesystem fallback because it requires Obsidian's active workspace state.
-`get_linked_notes` has no resolved-link fallback and returns an empty list
-when the plugin bridge is unavailable.
+Its fallback configuration is separate:
+
+```dotenv
+OBSIDIAN_VAULT_PATH=/absolute/path/to/your/vault
+OBSIDIAN_CONFIG_DIR=/absolute/path/to/your/vault/.obsidian
+OBSIDIAN_API_URL=http://127.0.0.1:27125
+OBSIDIAN_API_KEY=replace-with-the-plugin-bearer-token
+OBSIDIAN_PREFER_REST=true
+OBSIDIAN_TIMEOUT_MS=3000
+```
+
+Do not commit `.env` or bearer tokens.
+
+## 7. Verify HTTPS
+
+```bash
+curl --fail --silent \
+  --cacert /absolute/path/to/localhost.pem \
+  -H "Authorization: Bearer <paste-the-plugin-bearer-token>" \
+  https://127.0.0.1:27125/health
+```
+
+Expected response:
+
+```json
+{"status":"ok"}
+```
 
 For detailed failures, use [Troubleshooting](TROUBLESHOOTING.md).

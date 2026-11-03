@@ -95,6 +95,10 @@ export default class A2rgMcpBridgePlugin extends Plugin {
     return `${protocol}://127.0.0.1:${this.settings.port}`;
   }
 
+  getMcpUrl(): string {
+    return `${this.getBridgeUrl()}/mcp`;
+  }
+
   isTlsEnabled(): boolean {
     return this.settings.tlsEnabled;
   }

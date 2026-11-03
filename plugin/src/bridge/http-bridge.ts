@@ -2,6 +2,16 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer as createHttpServer, IncomingMessage, Server, ServerResponse } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
 import { AddressInfo } from "node:net";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
+import {
+  McpToolRegistry,
+  McpToolRouter,
+} from "../../../src/mcp-tool-registry.js";
 import {
   normalizeNoteRelativePath,
   VaultOperationError,
@@ -134,6 +144,14 @@ export class HttpBridge {
 
       if (method === "GET" && url.pathname === "/health") {
         this.sendJson(response, 200, { status: "ok" });
+        return;
+      }
+
+      if (
+        url.pathname === "/mcp"
+        && (method === "POST" || method === "GET" || method === "DELETE")
+      ) {
+        await this.handleMcpRequest(request, response);
         return;
       }
 
@@ -321,6 +339,89 @@ export class HttpBridge {
       }
       this.sendJson(response, 500, { error: message });
     }
+  }
+
+  private async handleMcpRequest(
+    request: IncomingMessage,
+    response: ServerResponse,
+  ): Promise<void> {
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+    });
+    const server = new McpServer(
+      {
+        name: "a2rg-obsidian-mcp",
+        version: "1.0.5",
+      },
+      {
+        capabilities: {
+          tools: {},
+        },
+      },
+    );
+    const toolRegistry = new McpToolRegistry(this.createMcpRouter());
+
+    server.server.setRequestHandler(ListToolsRequestSchema, async () => ({
+      tools: toolRegistry.listTools(),
+    }));
+    server.server.setRequestHandler(CallToolRequestSchema, async (rpcRequest) => {
+      try {
+        return await toolRegistry.callTool(
+          rpcRequest.params.name,
+          rpcRequest.params.arguments,
+        );
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Error ejecutando ${rpcRequest.params.name}: ${message}`,
+            },
+          ],
+        };
+      }
+    });
+
+    await server.connect(transport);
+
+    response.once("close", () => {
+      void transport.close();
+      void server.close();
+    });
+
+    await transport.handleRequest(request, response);
+  }
+
+  private createMcpRouter(): McpToolRouter {
+    return {
+      getFile: async (path) => {
+        const content = await this.options.vault.readFile(path);
+        if (content === null) {
+          throw new Error(`Archivo no encontrado: ${path}`);
+        }
+        return { content, source: "obsidian" };
+      },
+      writeFile: async (path, content) => {
+        await this.options.vault.writeFile(path, content);
+        return { source: "obsidian" };
+      },
+      appendFile: async (path, content) => {
+        await this.options.vault.appendFile(path, content);
+        return { source: "obsidian" };
+      },
+      deleteFile: async (path) => {
+        await this.options.vault.deleteFile(path);
+        return { source: "obsidian" };
+      },
+      listFiles: (directory) => this.options.vault.listFiles(directory),
+      search: (query, maxResults) => this.options.vault.searchFiles(query, maxResults),
+      getGraphNeighbors: (path, direction, depth, maxResults) =>
+        this.options.vault.getGraphNeighbors(path, direction, depth, maxResults),
+      getActiveFile: () => this.options.vault.getActiveFile()
+        .then((content) => content === null ? null : { content }),
+    };
   }
 
   private isAuthorized(request: IncomingMessage): boolean {
