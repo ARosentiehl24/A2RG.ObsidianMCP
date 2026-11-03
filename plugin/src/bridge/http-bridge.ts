@@ -352,7 +352,7 @@ export class HttpBridge {
     const server = new McpServer(
       {
         name: "@a2rg/obsidian-mcp",
-        version: "1.0.7",
+        version: "1.0.8",
       },
       {
         capabilities: {

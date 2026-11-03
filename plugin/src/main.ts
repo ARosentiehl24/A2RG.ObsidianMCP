@@ -21,6 +21,11 @@ export default class A2rgMcpBridgePlugin extends Plugin {
 
   async onload(): Promise<void> {
     await this.loadSettings();
+    const configDir = this.app.vault.configDir;
+    if (this.settings.configDir !== configDir) {
+      this.settings.configDir = configDir;
+      await this.saveData({ ...this.settings });
+    }
     if (!/^[0-9a-f]{64}$/i.test(this.settings.token)) {
       this.settings.token = randomBytes(32).toString("hex");
       await this.saveData({ ...this.settings });

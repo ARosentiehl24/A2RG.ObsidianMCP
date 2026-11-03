@@ -22,6 +22,8 @@ export interface ObsidianPluginSettings {
   token?: string;
   tlsCertificate?: string;
   tlsFingerprint?: string;
+  configDir?: string;
+  configDirPath?: string;
 }
 
 function readJsonObject(filePath: string): Record<string, unknown> | null {
@@ -78,40 +80,71 @@ export function readObsidianPluginSettings(
     return null;
   }
 
-  const settingsPath = path.join(
-    vaultPath,
-    ".obsidian",
-    "plugins",
-    "mcp-vault-connector",
-    "data.json",
-  );
-  const data = readJsonObject(settingsPath);
-  if (!data) {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(vaultPath, { withFileTypes: true });
+  } catch {
     return null;
   }
 
-  return {
-    enabled: typeof data.enabled === "boolean" ? data.enabled : undefined,
-    port:
-      typeof data.port === "number" && Number.isInteger(data.port)
-      && data.port >= 1
-      && data.port <= 65535
-        ? data.port
-        : undefined,
-    tlsEnabled:
-      typeof data.tlsEnabled === "boolean" ? data.tlsEnabled : undefined,
-    token:
-      typeof data.token === "string" && /^[0-9a-f]{64}$/i.test(data.token)
-        ? data.token
-        : undefined,
-    tlsCertificate:
-      typeof data.tlsCertificate === "string"
-      && data.tlsCertificate.includes("BEGIN CERTIFICATE")
-        ? data.tlsCertificate
-        : undefined,
-    tlsFingerprint:
-      typeof data.tlsFingerprint === "string" ? data.tlsFingerprint : undefined,
-  };
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    const discoveredConfigDirPath = path.join(vaultPath, entry.name);
+    const settingsPath = path.join(
+      discoveredConfigDirPath,
+      "plugins",
+      "mcp-vault-connector",
+      "data.json",
+    );
+    const data = readJsonObject(settingsPath);
+    if (!data) {
+      continue;
+    }
+
+    const recordedConfigDir =
+      typeof data.configDir === "string" ? data.configDir.trim() : "";
+    let configDirPath = discoveredConfigDirPath;
+    if (recordedConfigDir && !path.isAbsolute(recordedConfigDir)) {
+      const recordedPath = path.resolve(vaultPath, recordedConfigDir);
+      const relative = path.relative(vaultPath, recordedPath);
+      if (
+        relative !== ".."
+        && !relative.startsWith(`..${path.sep}`)
+        && !path.isAbsolute(relative)
+      ) {
+        configDirPath = recordedPath;
+      }
+    }
+
+    return {
+      enabled: typeof data.enabled === "boolean" ? data.enabled : undefined,
+      port:
+        typeof data.port === "number" && Number.isInteger(data.port)
+        && data.port >= 1
+        && data.port <= 65535
+          ? data.port
+          : undefined,
+      tlsEnabled:
+        typeof data.tlsEnabled === "boolean" ? data.tlsEnabled : undefined,
+      token:
+        typeof data.token === "string" && /^[0-9a-f]{64}$/i.test(data.token)
+          ? data.token
+          : undefined,
+      tlsCertificate:
+        typeof data.tlsCertificate === "string"
+        && data.tlsCertificate.includes("BEGIN CERTIFICATE")
+          ? data.tlsCertificate
+          : undefined,
+      tlsFingerprint:
+        typeof data.tlsFingerprint === "string" ? data.tlsFingerprint : undefined,
+      configDir: recordedConfigDir,
+      configDirPath,
+    };
+  }
+
+  return null;
 }
 
 export function discoverObsidianVaultPath(): string {
@@ -194,12 +227,12 @@ export function loadConfig(): Config {
   if (explicitConfigDir && !path.isAbsolute(explicitConfigDir)) {
     throw new Error("OBSIDIAN_CONFIG_DIR must be an absolute directory path");
   }
-  const configDirPath = explicitConfigDir
-    || (vaultPath ? path.join(vaultPath, ".obsidian") : "");
-
   const pluginSettings = vaultPath
     ? readObsidianPluginSettings(vaultPath)
     : null;
+  const configDirPath = explicitConfigDir
+    || pluginSettings?.configDirPath
+    || "";
 
   let apiUrl = "http://127.0.0.1:27125";
   let apiUrlSource: Config["apiUrlSource"] = "default";

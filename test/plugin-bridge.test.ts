@@ -187,7 +187,7 @@ test("HttpBridge exposes the registered tools through Streamable HTTP MCP", asyn
           capabilities: {},
           clientInfo: {
             name: "plugin-test",
-            version: "1.0.7",
+            version: "1.0.8",
           },
         },
       }),
