@@ -4,6 +4,7 @@ import { createServer as createHttpsServer } from "node:https";
 import { AddressInfo } from "node:net";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -350,13 +351,14 @@ export class HttpBridge {
     });
     const server = new McpServer(
       {
-        name: "a2rg-obsidian-mcp",
-        version: "1.0.5",
+        name: "@a2rg/obsidian-mcp",
+        version: "1.0.6",
       },
       {
         capabilities: {
           tools: {},
         },
+        jsonSchemaValidator: new CfWorkerJsonSchemaValidator(),
       },
     );
     const toolRegistry = new McpToolRegistry(this.createMcpRouter());

@@ -2,20 +2,20 @@
 
 Community plugin ID: `mcp-vault-connector`
 
-Current manifest version: `1.0.5`
+Current manifest version: `1.0.6`
 
 ## Responsibilities
 
 The plugin:
 
-- Reads and writes the active Obsidian instance through `App.vault`,
+- Reads and writes the active vault through `App.vault`,
   `App.metadataCache`, and `App.workspace`.
-- Serves REST operations and Streamable HTTP MCP on `/mcp`.
-- Authenticates every request with a bearer token.
+- Serves REST operations and Streamable HTTP MCP at `/mcp`.
+- Authenticates every `/mcp` and REST request with a bearer token.
 - Supports HTTP or local HTTPS on `127.0.0.1`.
 - Generates a local TLS certificate and private key when HTTPS is enabled.
 - Rejects hidden, absolute, traversal, and unsupported-extension paths.
-- Searches Markdown files and returns resolved internal-link neighbors.
+- Searches Markdown files and resolves internal-link neighbors.
 
 ## Installation
 
@@ -41,10 +41,13 @@ Settings are stored in:
 <vault>/.obsidian/plugins/mcp-vault-connector/data.json
 ```
 
+Do not commit or share `data.json`, the bearer token, or the generated private
+key material.
+
 The settings page provides:
 
 - Bridge start/stop status.
-- The active HTTP or HTTPS bridge URL.
+- The active HTTP or HTTPS base URL.
 - The Streamable HTTP MCP endpoint.
 - Enable/disable bridge toggle.
 - Local HTTPS toggle.
@@ -52,11 +55,13 @@ The settings page provides:
 - Bearer-token generation and rotation.
 - Public certificate fingerprint and replacement controls.
 
-Do not commit or share `data.json` or the bearer token.
+The bridge starts automatically when enabled in plugin settings. It listens
+only on `127.0.0.1` and does not connect to remote services or
+collect telemetry. The generated bearer token controls access to vault tools.
 
-## MCP HTTP endpoint
+## MCP endpoints
 
-The plugin binds only to `127.0.0.1`. The default port is `27125`.
+The bridge binds only to `127.0.0.1`. The default port is `27125`.
 
 HTTP:
 
@@ -76,38 +81,45 @@ Every request requires:
 Authorization: Bearer <64-character-plugin-token>
 ```
 
-The MCP endpoint is stateless. It initializes a new MCP server and transport
-for each HTTP request, without vault-path or client-side environment variables.
+The MCP endpoint is stateless. It creates a new MCP server and Streamable HTTP
+transport for each request. A persistent MCP session is not required.
 
-## HTTP operations
+## REST operations
 
-The bridge is local infrastructure, not a public API:
+The REST routes are supporting endpoints for the plugin bridge and remain
+local-only infrastructure:
 
 | Method | Path | Purpose |
 |---|---|---|
 | `POST`, `GET`, `DELETE` | `/mcp` | Streamable HTTP MCP. |
-| `GET` | `/health` | Check authenticated bridge availability. |
+| `GET` | `/health` | Authenticated bridge availability check. |
 | `GET` | `/active` | Read the active Obsidian file. |
 | `GET` | `/list` | List a vault directory. |
 | `GET` | `/search` | Search Markdown files. |
-| `GET` | `/graph` | Read resolved incoming and outgoing links. |
+| `GET` | `/graph` | Read resolved link neighbors. |
 | `POST` | `/append` | Append to a file. |
 | `GET` | `/vault/<path>` | Read a vault file. |
 | `PUT` | `/vault/<path>` | Create or replace a vault file. |
 | `DELETE` | `/vault/<path>` | Delete a vault file. |
 
-The plugin returns `401` for missing or invalid credentials and `404` for
-missing files or routes.
+## Provider configuration
 
-## Provider variables
-
-For HTTP MCP, no vault variables are needed:
+HTTP MCP needs no vault variables:
 
 - No `OBSIDIAN_VAULT_PATH`.
 - No `OBSIDIAN_CONFIG_DIR`.
 - No executable `command`.
-- No `OBSIDIAN_CA_CERT` unless using HTTPS.
-- One bearer token is required in the Authorization header.
+- No filesystem API key.
+- One bearer token in the `Authorization` header.
 
-The optional stdio executable uses those variables only as a separate fallback
-mode.
+When HTTPS is enabled, the MCP client also needs to trust the plugin's local
+certificate.
+
+The optional stdio executable is a separate fallback mode. It can use
+`OBSIDIAN_VAULT_PATH`, `OBSIDIAN_API_URL`, `OBSIDIAN_API_KEY`, and
+`OBSIDIAN_CONFIG_DIR` when needed.
+
+The npm package `@a2rg/obsidian-mcp` uses the same stdio executable behavior
+from Node. It can discover the vault and plugin settings automatically, with
+CLI and environment overrides for ambiguous or custom setups. See
+[npm and pnpm Package](NPM.md).

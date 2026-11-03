@@ -4,8 +4,8 @@ The MCP server exposes eight tools through Streamable HTTP at `/mcp` and
 through the optional stdio executable. Relative paths are vault-relative, not
 absolute filesystem paths.
 
-All tools return MCP text content. Search and list operations additionally
-serialize JSON in that text content.
+All tools return MCP text content. Search and list operations serialize JSON
+inside that text content.
 
 ## `get_file`
 
@@ -15,16 +15,12 @@ Reads a Markdown or text file.
 |---|---|---:|---|
 | `path` | string | Yes | Vault-relative file path. |
 
-Example:
-
 ```json
-{
-  "path": "00 - Inicio.md"
-}
+{"path":"00 - Inicio.md"}
 ```
 
-The Obsidian plugin bridge is preferred. The direct filesystem fallback reads
-from `OBSIDIAN_VAULT_PATH` only in stdio mode.
+The plugin bridge is preferred. The stdio executable may use
+`OBSIDIAN_VAULT_PATH` when the bridge is unavailable.
 
 ## `write_file`
 
@@ -35,17 +31,15 @@ Creates or replaces a file.
 | `path` | string | Yes | Vault-relative file path. |
 | `content` | string | Yes | Complete replacement content. |
 
-Example:
-
 ```json
 {
-  "path": "01 - Inbox/New note.md",
-  "content": "# New note\n"
+  "path":"01 - Inbox/New note.md",
+  "content":"# New note\n"
 }
 ```
 
-The plugin creates missing folders while active. The filesystem fallback
-also creates parent directories.
+The plugin creates missing folders while active. The stdio fallback also
+creates parent directories.
 
 ## `append_file`
 
@@ -56,11 +50,11 @@ Adds text to the end of a file.
 | `path` | string | Yes | Vault-relative file path. |
 | `content` | string | Yes | Text to append. |
 
-If the file does not exist, the operation creates it.
+If the file does not exist, it is created.
 
-The plugin accepts an append idempotency key and keeps completed append
-operations for five minutes. A repeated key with the same path and content
-does not append the content twice.
+The plugin keeps append idempotency keys for five minutes. Reusing a key with
+the same path and content does not append twice. A reused key with different
+content is rejected.
 
 ## `delete_file`
 
@@ -70,7 +64,7 @@ Deletes a file.
 |---|---|---:|---|
 | `path` | string | Yes | Vault-relative file path. |
 
-This operation is destructive. There is no MCP recycle-bin or undo operation.
+This operation is destructive. There is no MCP recycle bin or undo operation.
 Delete only through an explicit user request or a confirmed workflow.
 
 ## `search_vault`
@@ -80,138 +74,131 @@ Searches note names and Markdown or text content.
 | Parameter | Type | Required | Default | Description |
 |---|---|---:|---:|---|
 | `query` | string | Yes | - | Case-insensitive search text. |
-| `limit` | number | No | `20` | Maximum number of result files. |
-
-Example:
+| `limit` | number | No | `20` | Maximum result files. |
 
 ```json
-{
-  "query": "meeting",
-  "limit": 50
-}
+{"query":"meeting","limit":50}
 ```
 
-Plugin bridge search is preferred. Filesystem fallback is used when the bridge
-cannot be reached.
-
-The plugin maintains an in-memory trigram and bigram posting index, including
-note names, Markdown content, headings, tags, and frontmatter. The index is
-updated on create, modify, rename, and delete events. Search results are ranked
+The plugin maintains an in-memory trigram and bigram posting index for names,
+Markdown content, headings, tags, and frontmatter. Search results are ranked
 by resolved incoming-link count when available.
 
-The plugin also persists a local snapshot in:
+The plugin persists an index snapshot under:
 
 ```text
 <Obsidian config directory>/plugins/mcp-vault-connector/cache/search-index-v1.json
 ```
 
-The snapshot contains document metadata and posting maps. It does not contain
-full note contents or persisted search-result payloads. The file is replaced
-atomically and is accepted only when it is a regular file with private
-permissions. Search results remain in memory and expire after 60 seconds.
+The snapshot stores document metadata and posting maps, not complete note
+content or search-result payloads.
 
 ## `get_linked_notes`
 
-Returns notes connected to a note through Obsidian's resolved internal-link
-graph. This operation is available through the plugin bridge.
+Returns notes connected through Obsidian's resolved internal-link graph.
 
 | Parameter | Type | Required | Default | Description |
 |---|---|---:|---:|---|
-| `path` | string | Yes | - | Vault-relative source note path. |
+| `path` | string | Yes | - | Vault-relative source note. |
 | `direction` | string | No | `both` | `incoming`, `outgoing`, or `both`. |
-| `depth` | number | No | `1` | Maximum graph depth, from 1 to 3. |
-| `limit` | number | No | `20` | Maximum number of result notes. |
-
-Example:
+| `depth` | number | No | `1` | Graph depth from 1 to 3. |
+| `limit` | number | No | `20` | Maximum result notes. |
 
 ```json
 {
-  "path": "Projects/Roadmap.md",
-  "direction": "both",
-  "depth": 2,
-  "limit": 50
+  "path":"Projects/Roadmap.md",
+  "direction":"both",
+  "depth":2,
+  "limit":50
 }
 ```
 
-The response includes `path`, `depth`, `linkCount`, and `direction`. A
-filesystem fallback without the plugin returns an empty list because
-resolved internal-link metadata is available only in Obsidian.
+Filesystem fallback cannot provide resolved internal-link metadata and returns
+an empty list.
 
 ## `list_files`
 
 Lists direct children of a vault directory.
 
 | Parameter | Type | Required | Default | Description |
-|---|---|---:|---|---|
+|---|---|---:|---:|---|
 | `directory` | string | No | `""` | Vault-relative directory. |
 
-Example:
-
 ```json
-{
-  "directory": "10 - Proyectos"
-}
+{"directory":"10 - Proyectos"}
 ```
 
 The root directory is represented by an empty string.
 
-Result items include:
+Each item includes:
 
 - `path`
 - `name`
 - `isDirectory`
-- `size`, for files
-- `mtime`, for filesystem fallback items
+- `size` for files
+- `mtime` for stdio filesystem fallback items
 
 ## `get_active_file`
 
-Returns the content of the active Obsidian file.
+Returns the content of the currently active Obsidian file.
 
 No parameters.
 
-This tool has no filesystem fallback. It returns a message when no active file
-is available or the plugin bridge is disconnected.
+This tool has no filesystem fallback. It requires Obsidian, the plugin bridge,
+and an open active Markdown file.
 
 ## Path rules
 
-All tools that accept a path must reject:
+All path-taking tools reject:
 
 - Empty paths.
 - Absolute Unix or Windows paths.
-- `/`, `\`, `.`, `..`, and empty path segments.
+- `/`, `\`, `.`, `..`, and empty segments.
 - Traversal attempts such as `../secret.md`.
+- Hidden path segments.
+- Unsupported extensions where applicable.
 
-Use vault-relative paths with forward slash separators.
+Use vault-relative paths with forward-slash separators.
 
-## Fallback behavior
+## Transport behavior
 
 ```text
 Obsidian running
   -> authenticated plugin bridge
+  -> tool operation
 
 Obsidian closed or bridge unavailable
-  -> OBSIDIAN_VAULT_PATH
-
-Active file
-  -> plugin bridge only
+  -> optional stdio filesystem fallback
 ```
 
-Fallback is per operation. A bridge failure does not invalidate the
-filesystem fallback configuration.
-
-| Operation | When Obsidian or the bridge is unavailable |
+| Operation | Bridge unavailable |
 |---|---|
 | `get_file` | Read through `OBSIDIAN_VAULT_PATH`. |
 | `search_vault` | Search the fallback trigram/bigram index. |
-| `list_files` | List direct children from the physical vault. |
-| `write_file` | Write to the physical vault unless a REST result is ambiguous. |
-| `append_file` | Append to the physical vault unless a REST result is ambiguous. |
-| `delete_file` | Delete from the physical vault unless a REST result is ambiguous. |
-| `get_linked_notes` | Return an empty list; resolved Obsidian metadata is unavailable. |
-| `get_active_file` | No fallback; require the plugin and an active Obsidian file. |
+| `list_files` | List direct children from the filesystem. |
+| `write_file` | Write to the filesystem unless REST status is ambiguous. |
+| `append_file` | Append unless REST status is ambiguous or timed out. |
+| `delete_file` | Delete unless REST status is ambiguous. |
+| `get_linked_notes` | Return an empty list. |
+| `get_active_file` | No fallback. |
 
-Timed-out or reset write, append, and delete requests stop before filesystem
-fallback when the mutation status is ambiguous. This prevents a second mutation
-when the plugin may have applied the operation but the MCP client did not
-receive the response. Definite HTTP errors such as `401`, `404`, `413`, and
-other 4xx/5xx responses are not retried as fallback mutations.
+Ambiguous mutations do not retry through the filesystem. This prevents an
+operation from being applied twice when a REST response may have been lost.
+
+## HTTP/HTTPS versus npm stdio
+
+The HTTP and HTTPS MCP transports belong to the running Obsidian plugin. They
+do not read the vault filesystem directly and do not continue when Obsidian or
+the plugin bridge is unavailable.
+
+The npm/pnpm stdio executable is plugin-first and may use filesystem fallback:
+
+```text
+npx -y @a2rg/obsidian-mcp
+  -> plugin REST/HTTPS
+  -> if transport unavailable: local vault filesystem
+```
+
+It discovers the vault and plugin settings from Obsidian's app configuration and
+the plugin `data.json`. It also accepts `OBSIDIAN_VAULT_PATH`,
+`OBSIDIAN_API_URL`, `OBSIDIAN_API_KEY`, `OBSIDIAN_CA_CERT`, and CLI overrides.

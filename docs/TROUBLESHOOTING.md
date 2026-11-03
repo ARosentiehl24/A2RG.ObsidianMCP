@@ -1,8 +1,6 @@
 # Troubleshooting
 
-## Check HTTP or HTTPS MCP
-
-Verify the MCP endpoint, not only the REST health endpoint:
+## Check Streamable HTTP MCP
 
 ```bash
 curl --fail --silent \
@@ -13,12 +11,11 @@ curl --fail --silent \
   http://127.0.0.1:27125/mcp
 ```
 
-## REST health
+For the authenticated health endpoint:
 
 ```bash
-export OBSIDIAN_API_KEY='<paste-the-plugin-bearer-token>'
 curl --fail --silent \
-  -H "Authorization: Bearer ${OBSIDIAN_API_KEY}" \
+  -H "Authorization: Bearer <64-character-plugin-token>" \
   http://127.0.0.1:27125/health
 ```
 
@@ -33,20 +30,22 @@ Expected response:
 Possible causes:
 
 - Obsidian is closed.
-- The plugin is disabled.
+- **A2RG MCP Bridge** is disabled.
 - The plugin failed to start.
-- The HTTP MCP URL uses the wrong port.
+- The MCP URL has the wrong port.
 - The HTTPS certificate is not trusted.
-- A firewall or local network policy blocks loopback access.
+- A local firewall or network policy blocks loopback traffic.
 
 Check:
 
 1. Obsidian is open.
-2. **A2RG MCP Bridge** is enabled.
-3. Port is `27125` or matches `.env`.
-4. `/health` returns `200`.
+2. The plugin is enabled.
+3. The plugin settings allow the expected port.
+4. The bridge status is running.
+5. `/health` returns `200`.
 
-If Obsidian is closed, test a filesystem operation instead:
+When Obsidian is closed, the optional stdio executable can test filesystem
+fallback:
 
 ```dotenv
 OBSIDIAN_VAULT_PATH=/absolute/path/to/your/vault
@@ -54,37 +53,40 @@ OBSIDIAN_VAULT_PATH=/absolute/path/to/your/vault
 
 `get_active_file` has no filesystem fallback.
 
-## HTTPS is enabled but the MCP server fails TLS verification
+## HTTPS certificate verification fails
 
 For HTTPS MCP, configure the client to trust the PEM certificate shown by the
-plugin. For the optional stdio REST client, set `OBSIDIAN_CA_CERT` to that PEM
-certificate or to an exact local certificate file path.
+plugin. Node-based clients can use `NODE_EXTRA_CA_CERTS` when the client
+supports it.
+
+For the optional stdio REST client:
 
 ```dotenv
 OBSIDIAN_API_URL=https://127.0.0.1:27125
 OBSIDIAN_CA_CERT=/absolute/path/to/localhost.pem
 ```
 
-Restart the MCP client after changing the CA path. Do not disable certificate
-verification. The generated self-signed certificate is valid only for this
-loopback setup and is not for a public HTTPS server.
+Restart the MCP client after changing certificate trust. Do not disable
+certificate verification.
+
+The generated certificate is valid only for loopback and is not a public HTTPS
+certificate.
 
 ## HTTP `401 Unauthorized`
 
-The bearer token differs between plugin and MCP configuration.
+The bearer token differs between the plugin and the MCP configuration.
 
 Check:
 
 1. Open the plugin settings.
-2. Copy the current token.
-3. In HTTP/HTTPS MCP configuration, send `Authorization: Bearer <token>`.
+2. Copy the current 64-character token.
+3. In HTTP/HTTPS MCP configuration, send
+   `Authorization: Bearer <64-character-plugin-token>`.
 4. For stdio mode, set `OBSIDIAN_API_KEY` to the exact same value.
 5. Restart MCP clients.
 
-The plugin supports token rotation. Any process that caches the old token must
-be restarted.
-
-Do not include the token in issue reports or screenshots.
+Any process that caches the old token must be restarted after token rotation.
+Do not include bearer tokens in issue reports or screenshots.
 
 ## HTTP `404` for active file
 
@@ -97,9 +99,9 @@ Open a note, then call `get_active_file` again.
 If another process owns the configured port:
 
 1. Stop or remove the conflicting listener.
-2. Choose a different port in plugin settings.
-3. Set the same port in `OBSIDIAN_API_URL`.
-4. Restart Obsidian and MCP clients.
+2. Choose a free port in plugin settings.
+3. Restart Obsidian and MCP clients.
+4. Update the provider URL to the new port.
 
 The bridge binds only to `127.0.0.1`.
 
@@ -107,38 +109,29 @@ The bridge binds only to `127.0.0.1`.
 
 For HTTP or HTTPS MCP:
 
-Check:
+1. Confirm that the client supports Streamable HTTP, not only legacy SSE.
+2. Confirm that the URL ends in `/mcp`.
+3. Confirm that the bearer header is included.
+4. Confirm that Obsidian and the plugin bridge are running.
+5. Restart the MCP client.
 
-1. The client supports Streamable HTTP MCP.
-2. The URL ends in `/mcp`.
-3. The bearer header is included.
-4. Obsidian and the plugin bridge are running.
-5. The MCP client was restarted.
+For stdio fallback:
 
-For stdio fallback, verify the executable separately:
+1. Run `npm run build`.
+2. Confirm `dist/a2rg-obsidian-mcp` exists.
+3. Confirm the MCP entry path is absolute.
+4. Confirm `OBSIDIAN_VAULT_PATH` points to the open vault.
+5. Restart the MCP client.
 
-1. `npm run build` completed successfully.
-2. `dist/a2rg-obsidian-mcp` exists.
-3. The MCP entry path is absolute.
-4. The server is not disabled in client configuration.
-
-Test the stdio server directly:
+Test the stdio executable directly:
 
 ```bash
 /absolute/path/to/A2RG.ObsidianMCP/dist/a2rg-obsidian-mcp
 ```
 
-A stdio server normally waits without printing additional text after startup.
-
 ## MCP server prints a startup error
 
-Run the compiled Bun entry point directly:
-
-```bash
-./dist/a2rg-obsidian-mcp
-```
-
-Common errors:
+Common checks:
 
 | Symptom | Likely action |
 |---|---|
@@ -156,13 +149,13 @@ Verify:
 test -d "$OBSIDIAN_VAULT_PATH"
 ```
 
-Use an absolute path without placeholders:
+Use an absolute vault path:
 
 ```dotenv
 OBSIDIAN_VAULT_PATH=/home/alice/Obsidian/MyVault
 ```
 
-Do not point the fallback at `/`, `/home`, or a directory containing unrelated
+Do not point fallback at `/`, `/home`, or a directory containing unrelated
 private files.
 
 ## File operation is rejected
@@ -174,8 +167,9 @@ Path validation rejects:
 - `.` and `..` segments.
 - Empty path segments.
 - Windows absolute paths.
+- Hidden paths and unsupported extensions.
 
-Use vault-relative paths:
+Use vault-relative forward-slash paths:
 
 ```text
 Good: 10 - Projects/Alpha.md
@@ -186,34 +180,49 @@ Bad:  C:\Obsidian\Alpha.md
 
 ## Search returns too many or too few files
 
-The plugin bridge and fallback accept the `limit` parameter.
-
 - Default limit: `20`.
 - Bridge maximum: `100`.
 - `query` is case-insensitive.
 - Hidden directories are ignored.
-- Only Markdown and text files are searched by fallback.
+- The stdio fallback searches Markdown and text files.
 
 ## Request body limit
 
-Plugin bridge write and append requests are limited to 5 MB. Split large
-imports or uploads into smaller confirmed operations.
+Plugin bridge write and append requests are limited to 5 MB. Split large imports
+or uploads into smaller operations.
 
-## Plugin settings are not retained
+## Public server or HTTPS is not working
 
-Settings are stored in:
-
-```text
-<vault>/.obsidian/plugins/mcp-vault-connector/data.json
-```
-
-The bearer token and public TLS certificate are stored in Obsidian plugin data.
-The TLS private key is held only in plugin process memory. Do not commit
-`data.json` or copy the bearer token into the vault.
-
-## Public server or HTTPS is still not working
-
-The plugin server is loopback-only and is not a public HTTPS or public MCP
-server. Do not publish its port or REST endpoints.
+The plugin server is loopback-only. It is not a public HTTP or HTTPS service.
+Do not publish port `27125` or expose REST routes through a reverse proxy.
 
 See [Security and Public Deployment](SECURITY.md).
+
+## npm package cannot discover the vault
+
+Run:
+
+```bash
+npx -y @a2rg/obsidian-mcp --discover
+```
+
+The result must include a vault path, plugin URL, and configured bearer token
+and CA certificate. If discovery is ambiguous, pass an absolute vault path:
+
+```bash
+npx -y @a2rg/obsidian-mcp --vault "/absolute/path/to/Vault" --discover
+```
+
+Environment overrides are also available:
+
+```dotenv
+OBSIDIAN_VAULT_PATH=/absolute/path/to/your/vault
+OBSIDIAN_API_URL=https://127.0.0.1:27125
+OBSIDIAN_API_KEY=<64-character-plugin-token>
+OBSIDIAN_CA_CERT=/absolute/path/to/localhost.pem
+OBSIDIAN_PREFER_REST=true
+OBSIDIAN_TIMEOUT_MS=3000
+```
+
+The package should not be configured with a public hostname or a remote vault
+path. The REST and HTTPS bridge remain loopback-only.

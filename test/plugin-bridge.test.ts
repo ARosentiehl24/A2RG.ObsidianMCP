@@ -187,13 +187,13 @@ test("HttpBridge exposes the registered tools through Streamable HTTP MCP", asyn
           capabilities: {},
           clientInfo: {
             name: "plugin-test",
-            version: "1.0.5",
+            version: "1.0.6",
           },
         },
       }),
     });
     assert.equal(initialize.status, 200);
-    assert.match(await initialize.text(), /"serverInfo"[\s\S]*"name":"a2rg-obsidian-mcp"/);
+    assert.match(await initialize.text(), /"serverInfo"[\s\S]*"name":"@a2rg\/obsidian-mcp"/);
 
     const tools = await fetch(`http://127.0.0.1:${address.port}/mcp`, {
       method: "POST",

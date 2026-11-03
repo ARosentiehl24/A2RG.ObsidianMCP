@@ -73,7 +73,7 @@ export class HybridRouter {
     if (this.preferRestApi) {
       const apiRes = await this.api.listFiles(subDirectory);
       if (apiRes.ok && Array.isArray(apiRes.data)) {
-        return apiRes.data as FileItem[];
+        return apiRes.data;
       }
       this.throwDefiniteApiError(apiRes);
     }

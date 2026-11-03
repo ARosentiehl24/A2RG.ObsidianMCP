@@ -1,45 +1,37 @@
 # A2RG MCP Bridge
 
-A local Model Context Protocol (MCP) integration for Obsidian, with a desktop
-plugin, Streamable HTTP transport, and an optional stdio filesystem fallback.
+A2RG MCP Bridge connects MCP clients to an open Obsidian vault through a local
+desktop plugin. It exposes eight vault tools through Streamable HTTP MCP and
+keeps an optional Bun stdio process for filesystem fallback.
 
-The project has two cooperating components:
+Current release: `1.0.6`.
 
-- **A2RG MCP Bridge** (`mcp-vault-connector`) reads and writes the active vault
-  through `App.vault`, `App.metadataCache`, and `App.workspace`.
-- **A2RG Obsidian MCP** exposes the same eight tools through Streamable HTTP
-  at `/mcp`. The Bun executable remains available as an optional stdio fallback.
+## Components
 
-Current release: `1.0.5`.
+- **Obsidian plugin** `mcp-vault-connector`: reads and writes the active vault
+  through Obsidian APIs and exposes a loopback HTTP or HTTPS server.
+- **MCP executable** `dist/a2rg-obsidian-mcp`: optional stdio fallback for
+  filesystem access when Obsidian or the plugin bridge is unavailable.
+- **Public npm package** `@a2rg/obsidian-mcp`: Node stdio executable for
+  plugin-first access and automatic filesystem fallback.
+- **Shared tool registry**: the plugin and stdio executable expose the same
+  eight tools and argument schemas.
 
 ## Architecture
 
 ```text
 MCP client
-    |
-    | HTTP or HTTPS + bearer token
-    v
-http://127.0.0.1:27125/mcp
-    |
-    v
-A2RG MCP Bridge plugin
-    |
-    v
-App.vault / App.metadataCache / App.workspace
+  -> Streamable HTTP /mcp
+  -> authenticated local plugin bridge
+  -> App.vault / App.metadataCache / App.workspace
 ```
 
-For HTTP MCP, no vault path or executable is needed in the provider: the plugin
-uses the vault that is open in Obsidian. The optional stdio executable can
-still use `OBSIDIAN_VAULT_PATH` as a filesystem fallback when Obsidian or the
-bridge is unavailable.
-
-> [!IMPORTANT]
-> The bridge is local desktop infrastructure. It binds only to
-> `127.0.0.1` and must not be published directly to the internet.
+HTTP is convenient for loopback testing. HTTPS is recommended when the client
+supports local certificate trust.
 
 ## Quick start
 
-1. Build and install the plugin:
+1. Install dependencies and build:
 
    ```bash
    npm install
@@ -52,15 +44,15 @@ bridge is unavailable.
    <vault>/.obsidian/plugins/mcp-vault-connector/
    ```
 
-3. Enable **A2RG MCP Bridge** in Obsidian.
+3. Enable **A2RG MCP Bridge** in Obsidian Community Plugins.
 
 4. In plugin settings:
    - Enable the bridge.
-   - Keep port `27125` unless you deliberately change it.
-   - Choose HTTP or generate a local HTTPS certificate.
-   - Copy the bearer token.
+   - Keep port `27125` unless a conflict requires another port.
+   - Enable local HTTPS only if the MCP client can trust the generated certificate.
+   - Copy the 64-character bearer token.
 
-5. Configure the MCP client with:
+5. Configure the MCP client:
 
    ```json
    {
@@ -69,28 +61,42 @@ bridge is unavailable.
          "type": "http",
          "url": "http://127.0.0.1:27125/mcp",
          "headers": {
-           "Authorization": "Bearer replace-with-the-plugin-bearer-token"
+           "Authorization": "Bearer <64-character-plugin-token>"
          }
        }
      }
    }
    ```
 
-No `OBSIDIAN_VAULT_PATH`, executable `command`, vault `.obsidian` directory,
-or filesystem API key variables are required for HTTP MCP.
+Use `https://127.0.0.1:27125/mcp` when local HTTPS is enabled.
+
+HTTP MCP does not require `OBSIDIAN_VAULT_PATH`, `OBSIDIAN_CONFIG_DIR`,
+`OBSIDIAN_API_KEY`, `OBSIDIAN_API_URL`, a `command`, or an executable path.
+The provider needs only the MCP URL and the bearer token.
+
+## Network and privacy disclosure
+
+The plugin starts a server only on `127.0.0.1` (localhost). It does not expose
+the vault to the public internet, send vault content to a remote service,
+collect telemetry, or include dynamic advertising.
+
+Every `/mcp` and REST request requires a generated bearer token. HTTP is
+available for trusted loopback testing; HTTPS is recommended. The optional npm
+stdio package can access only the discovered local vault when the bridge is
+unavailable, and does not provide a public network endpoint.
 
 ## Verify
 
 ```bash
 curl --fail --silent \
-  -H "Authorization: Bearer <paste-the-plugin-bearer-token>" \
+  -H "Authorization: Bearer <64-character-plugin-token>" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
   http://127.0.0.1:27125/mcp
 ```
 
-The MCP client should discover eight tools:
+The server exposes:
 
 - `get_file`
 - `write_file`
@@ -101,22 +107,57 @@ The MCP client should discover eight tools:
 - `list_files`
 - `get_active_file`
 
-See [MCP tools](docs/TOOLS.md) for parameters and behavior.
-
 ## Requirements
 
 - Obsidian Desktop 1.14.4 or later.
-- Node.js 22 or later for plugin builds.
+- Node.js 22 or later for source builds.
 - npm.
 - A local Markdown vault.
-- An MCP client that supports Streamable HTTP or stdio servers.
+- An MCP client with Streamable HTTP support.
 
 ## Optional stdio fallback
 
-The stdio executable remains available when Obsidian is closed or the bridge is
-unavailable. It needs `OBSIDIAN_VAULT_PATH` and, for REST-first behavior,
-`OBSIDIAN_API_URL` and `OBSIDIAN_API_KEY`. HTTP MCP does not need those
-variables.
+The stdio executable remains available when Obsidian or the plugin bridge is
+unavailable. It can discover the vault and plugin settings automatically.
+Environment variables remain available for overrides.
+
+Run the public npm package without a global install:
+
+```bash
+npx -y @a2rg/obsidian-mcp
+```
+
+Or install it with npm/pnpm:
+
+```bash
+npm install -g @a2rg/obsidian-mcp
+# or
+pnpm add -g @a2rg/obsidian-mcp
+```
+
+With pnpm without a global install:
+
+```bash
+pnpm dlx @a2rg/obsidian-mcp --discover
+pnpm dlx @a2rg/obsidian-mcp
+```
+
+Discovery can be checked without starting MCP:
+
+```bash
+npx -y @a2rg/obsidian-mcp --discover
+```
+
+The package:
+
+1. Tries plugin HTTP/HTTPS REST first.
+2. Uses the Obsidian vault filesystem if the bridge is unavailable.
+3. Avoids filesystem fallback after definite `4xx/5xx` responses.
+4. Avoids filesystem writes after ambiguous REST write, append, or delete
+   operations.
+
+See [npm and pnpm Package](docs/NPM.md) for MCP client configuration,
+auto-discovery, CLI flags, cache behavior, and publication.
 
 ## Documentation
 
@@ -125,6 +166,8 @@ variables.
 - [MCP Tools](docs/TOOLS.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Security and Public Deployment](docs/SECURITY.md)
+- [npm and pnpm Package](docs/NPM.md)
+- [Contributing](CONTRIBUTING.md)
 
 ## Development
 
@@ -132,34 +175,37 @@ variables.
 npm test
 npm run dev:mcp
 npm run dev:plugin
+npm run build:npm
 npm run build
 ```
 
-`npm test` uses Bun's test runner. `npm run build` type-checks the plugin,
+`npm test` runs the Bun test suite. `npm run build` type-checks both targets,
 bundles `main.js`, and compiles `dist/a2rg-obsidian-mcp`.
 
 ## Release
 
-Plugin releases are automated by `.github/workflows/release.yml`.
+Plugin releases use `.github/workflows/release.yml`.
 
 1. Update `manifest.json`, `package.json`, `package-lock.json`, and
-   `versions.json`.
-2. Commit and push the source changes.
-3. Create and push a tag matching `manifest.json.version`.
-4. Let GitHub Actions build, test, attest, and create a draft release.
-5. Publish the draft with `main.js` and `manifest.json` attached.
-6. Submit or update the plugin in the Obsidian community directory.
+   `versions.json` to the same version.
+2. Run `npm test` and `npm run build`.
+3. Commit and push the source changes.
+4. Create and push a tag that exactly matches `manifest.json.version`; do not
+   prefix it with `v`.
+5. Publish the GitHub draft release with `main.js` and `manifest.json`.
+6. Submit or refresh the Obsidian community review.
+7. Run or trigger `.github/workflows/npm-publish.yml` to publish the npm CLI.
 
 ## Security boundary
 
-- The plugin listens only on `127.0.0.1`.
+- The plugin binds only to `127.0.0.1`.
 - Every `/mcp` and REST request requires the bearer token.
 - Relative vault paths are validated.
 - Absolute paths and `.` / `..` path segments are rejected.
 - Request bodies are capped at 5 MB.
-- HTTP is retained for loopback-only local testing.
-- HTTPS is optional and uses a generated local certificate.
-- The stdio fallback does not replace authentication for a remote service.
+- HTTP is limited to local testing.
+- HTTPS uses a generated self-signed certificate that clients must trust.
+- The stdio fallback does not replace authentication for a public service.
 
-Read [Security and Public Deployment](docs/SECURITY.md) before changing the
-loopback-only deployment model.
+Read [Security and Public Deployment](docs/SECURITY.md) before changing this
+local-only deployment model.

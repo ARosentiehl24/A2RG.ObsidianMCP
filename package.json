@@ -1,12 +1,40 @@
 {
-  "name": "a2rg-obsidian-mcp",
-  "version": "1.0.5",
-  "description": "Enterprise-grade hybrid MCP server for Obsidian with REST API and direct filesystem fallback",
+  "name": "@a2rg/obsidian-mcp",
+  "version": "1.0.6",
+  "description": "MCP stdio package for Obsidian with plugin-first REST access and automatic local filesystem fallback",
   "type": "module",
+  "main": "./dist/npm/cli.js",
+  "bin": {
+    "obsidian-mcp": "dist/npm/cli.js"
+  },
+  "files": [
+    "dist/npm/**/*.js",
+    "dist/npm/**/*.d.ts",
+    "README.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "docs/**/*.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ARosentiehl24/A2RG.ObsidianMCP.git"
+  },
+  "homepage": "https://github.com/ARosentiehl24/A2RG.ObsidianMCP#readme",
+  "bugs": {
+    "url": "https://github.com/ARosentiehl24/A2RG.ObsidianMCP/issues"
+  },
   "scripts": {
     "build": "npm run build:mcp && npm run build:plugin",
     "build:mcp": "tsc && bun build src/index.ts --compile --outfile dist/a2rg-obsidian-mcp --target bun --minify",
+    "build:npm": "tsc -p tsconfig.npm.json",
     "build:plugin": "tsc -p plugin/tsconfig.json --noEmit && node esbuild.config.mjs production",
+    "prepublishOnly": "npm test && npm run build:npm",
     "start": "./dist/a2rg-obsidian-mcp",
     "dev": "npm run dev:mcp",
     "dev:mcp": "bun --watch src/index.ts",
@@ -23,6 +51,7 @@
   "author": "Alberto (@a2rg)",
   "license": "MIT",
   "dependencies": {
+    "@cfworker/json-schema": "^4.1.4",
     "@modelcontextprotocol/sdk": "^1.6.1",
     "selfsigned": "^5.5.0",
     "zod": "^4.6.7"
