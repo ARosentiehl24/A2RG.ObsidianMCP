@@ -1,6 +1,6 @@
 {
   "name": "@a2rg/obsidian-mcp",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "MCP stdio package for Obsidian with plugin-first REST access and automatic local filesystem fallback",
   "type": "module",
   "main": "./dist/npm/cli.js",
@@ -34,6 +34,7 @@
     "build:mcp": "tsc && bun build src/index.ts --compile --outfile dist/a2rg-obsidian-mcp --target bun --minify",
     "build:npm": "tsc -p tsconfig.npm.json",
     "build:plugin": "tsc -p plugin/tsconfig.json --noEmit && node esbuild.config.mjs production",
+    "prepack": "node -e \"require('node:fs').chmodSync('dist/npm/cli.js', 0o755)\"",
     "prepublishOnly": "npm test && npm run build:npm",
     "start": "./dist/a2rg-obsidian-mcp",
     "dev": "npm run dev:mcp",
