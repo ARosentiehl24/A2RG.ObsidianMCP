@@ -1,6 +1,7 @@
 import esbuild from "esbuild";
 import process from "node:process";
 import { builtinModules } from "node:module";
+import path from "node:path";
 
 const production = process.argv[2] === "production";
 
@@ -10,6 +11,10 @@ const context = await esbuild.context({
   },
   entryPoints: ["plugin/src/main.ts"],
   bundle: true,
+  alias: {
+    ajv: path.resolve("plugin/src/shims/ajv.ts"),
+    "ajv-formats": path.resolve("plugin/src/shims/ajv-formats.ts"),
+  },
   external: [
     "obsidian",
     "electron",

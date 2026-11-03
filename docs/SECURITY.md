@@ -2,93 +2,90 @@
 
 ## Supported deployment model
 
-A2RG MCP Bridge is designed for a single desktop machine:
+A2RG MCP Bridge is designed for one desktop machine:
 
 ```text
-MCP client -> HTTP/HTTPS /mcp endpoint -> plugin -> Obsidian
-
-Optional stdio fallback:
-MCP client -> stdio process -> 127.0.0.1 plugin bridge or vault filesystem
+MCP client
+  -> HTTP or HTTPS loopback /mcp
+  -> authenticated Obsidian plugin
+  -> open vault
 ```
 
-The plugin server binds only to `127.0.0.1`. It must not be exposed directly
-to the public internet.
+Optional stdio fallback:
 
-If Obsidian is closed, the MCP server should use
-`OBSIDIAN_VAULT_PATH` for direct filesystem fallback. The fallback is a local
-desktop feature and is not a substitute for authentication in a remote service.
+```text
+MCP client
+  -> stdio process
+  -> plugin bridge or local filesystem
+```
+
+The plugin bridge starts a loopback-only server according to the bridge
+setting. The plugin does not send vault content to a remote service and does
+not collect telemetry.
+
+The plugin binds only to `127.0.0.1`. Do not expose the bridge directly to
+the public internet.
 
 ## Authentication
 
-Every bridge request requires a bearer token:
+Every `/mcp` and REST request requires a bearer token:
 
 ```text
-Authorization: Bearer <64-character-token>
+Authorization: Bearer <64-character-plugin-token>
 ```
 
-The token is generated with 32 random bytes and represented by 64 hexadecimal
-characters. It is not a TLS certificate, private key, or public key.
+The token is generated from 32 random bytes and represented as 64 hexadecimal
+characters.
 
-Protect the following values:
+Protect:
 
-- `~/.config/obsidian/a2rg-mcp-bridge/token`: contains the plugin bearer token.
-- `~/.config/obsidian/a2rg-mcp-bridge/tls/localhost-key.pem`: contains the local
-  TLS private key.
-- `plugin/data.json`: contains non-secret bridge settings.
-- `<Obsidian config directory>/plugins/mcp-vault-connector/cache/search-index-v1.json`: contains
-  vault file names and posting metadata.
-- `.env`: may contain `OBSIDIAN_API_KEY` for optional stdio mode.
-- HTTP MCP client configuration: contains the bearer token in the Authorization
-  header.
-- MCP client configuration: may contain environment values or secret references.
-- Shell history: may contain token values if commands are pasted insecurely.
+- The bearer token.
+- Obsidian plugin `data.json`.
+- The generated TLS private key while HTTPS is enabled.
+- Search-index snapshot files.
+- MCP client configuration and environment values.
+- Shell history and issue screenshots.
 
-Do not place bearer tokens in Markdown notes, issue reports, screenshots,
-source control, or public documentation.
+Do not place bearer tokens or private keys in Markdown notes, source control,
+issue reports, screenshots, or public documentation.
 
 ## Transport security
 
-The bridge binds only to loopback. HTTP is supported for local testing, while
-HTTPS is recommended and certificate verification is always enabled. The MCP
-client refuses TLS certificates that it cannot verify against the configured
-CA; no environment variable can disable certificate verification.
+HTTP is supported only for trusted loopback testing. HTTPS is recommended and
+uses a generated self-signed certificate that clients must explicitly trust.
 
-The plugin refuses to start the bridge when the secure configuration directory,
-bearer-token file, or TLS private key has insecure POSIX permissions. It also
-checks that the TLS private key is stored inside the secure configuration
-directory. These checks are platform-specific and require a filesystem that
-applies POSIX modes.
+The plugin private key is held in plugin process memory. The public certificate
+and related settings are stored in plugin data.
 
-Do not use SSH port forwarding or reverse-proxy configuration that publishes:
+Do not use SSH forwarding or reverse proxies to publish:
 
 - `127.0.0.1:27125`
+- `/mcp`
 - `/vault/*`
 - `/append`
 - `/delete`
 - `/active`
 
-without both authentication and TLS.
+There is no public browser login or OAuth flow.
 
-There is no CORS or browser login flow. Bearer authentication alone is not
-enough for a public network endpoint.
+## Using HTTP or HTTPS MCP
 
-## Using HTTP and HTTPS MCP
+The plugin serves MCP at `/mcp` over loopback HTTP or HTTPS.
 
-The plugin exposes MCP at `/mcp` over loopback HTTP or HTTPS. HTTP is suitable
-for local testing and trusted loopback clients. HTTPS uses a generated
-self-signed certificate that clients must explicitly trust. Neither mode is
-intended for public network access.
+- HTTP: simplest local setup, but bearer traffic stays unencrypted on the
+  loopback interface.
+- HTTPS: recommended local setup, but the MCP client must trust the generated
+  local certificate.
 
-For a public deployment, HTTP or HTTPS belongs at an external MCP service
-boundary. The public service must implement authentication and use a publicly
-trusted certificate.
+Neither mode is intended for public network access.
 
-Recommended architecture:
+For a public service, use an external MCP server with authentication and a
+certificate issued for a public hostname.
 
 ```text
 Public client
-  -> TLS reverse proxy
-  -> authenticated MCP HTTP/SSE service
+  -> public HTTPS
+  -> authenticated external MCP service
   -> server filesystem or server-side vault API
 
 Obsidian desktop
@@ -98,90 +95,44 @@ Obsidian desktop
 
 Do not send desktop vault credentials to an untrusted remote server.
 
-## Certificate files
-
-A public HTTPS server needs a certificate chain and private key:
-
-| File | Purpose | Permissions |
-|---|---|---|
-| `fullchain.pem` | Public certificate chain sent to clients. | `0644` |
-| `privkey.pem` | Server private key. | `0600`, ideally restricted to the service account. |
-
-Use a certificate issued for the public hostname, such as a certificate from
-Let's Encrypt. Do not use a self-signed certificate for a public endpoint.
-
-Keep private keys outside source control and plugin settings:
-
-```text
-/etc/a2rg-mcp/tls/fullchain.pem
-/etc/a2rg-mcp/tls/privkey.pem
-```
-
-Example permissions:
-
-```bash
-sudo chmod 600 /etc/a2rg-mcp/tls/privkey.pem
-sudo chmod 755 /etc/a2rg-mcp/tls
-sudo chown root:a2rg-mcp /etc/a2rg-mcp/tls/privkey.pem
-sudo chmod 644 /etc/a2rg-mcp/tls/fullchain.pem
-```
-
-The exact service account and group names depend on the host.
-
-For local TLS testing, a self-signed certificate can be generated, but clients
-must explicitly trust or verify it. The plugin stores the public certificate in
-its plugin data and keeps the private key only in process memory. Set
-`OBSIDIAN_CA_CERT` to the PEM certificate or to a local certificate file path.
-It is not intended for public HTTPS:
-
-```bash
-openssl req -x509 -nodes -newkey rsa:2048 \
-  -keyout privkey.pem \
-  -out fullchain.pem \
-  -days 30 \
-  -subj "/CN=localhost"
-```
-
-This command is for testing only. Public browsers and API clients will not
-trust this certificate automatically.
-
-## Reverse proxy requirements
-
-A reverse proxy should:
-
-- Listen on public HTTPS port `443`.
-- Serve a valid certificate for the public hostname.
-- Forward traffic only to an authenticated loopback MCP service.
-- Set reasonable request-size limits.
-- Disable public access to plugin administration endpoints.
-- Apply rate limiting and audit logging.
-- Strip untrusted `Authorization`, forwarding headers, and routing headers.
-- Run with a minimal service account.
-- Rotate private keys, bearer tokens, and certificates according to policy.
-
-An example Caddy file can obtain certificates automatically:
-
-```caddy
-mcp.example.com {
-  reverse_proxy 127.0.0.1:3000
-}
-```
-
-This example requires a public DNS record and a Caddy listener on port `3000`
-that implements MCP authentication. It does not expose the Obsidian plugin
-bridge.
-
 ## Vault data protections
 
-- Use an allowlisted, absolute vault path.
-- Do not run the fallback against `/`, `/home`, or a parent directory containing
+- Use an allowlisted absolute vault path only for stdio fallback.
+- Do not run fallback against `/`, `/home`, or a parent directory containing
   unrelated credentials.
-- Back up the vault before enabling remote write operations.
 - Reject path traversal and absolute paths at every trust boundary.
 - Limit request bodies and search result counts.
-- Do not expose deletion as a public operation without confirmation and audit
-  controls.
+- Back up the vault before enabling remote or automated write operations.
 - Review files and permissions after writes.
+- Delete only through explicit user confirmation or a confirmed workflow.
+
+## Dynamic code and JSON validation
+
+The plugin HTTP bridge uses the MCP SDK with the Cloudflare Worker-compatible
+JSON Schema validator. It does not use `eval`, `new Function`, or AJV code
+generation in the plugin bundle.
+
+Tool arguments are also parsed by the shared Zod schemas in
+`src/tool-schemas.ts`.
+
+## npm package and filesystem fallback
+
+The public npm package is an optional stdio process. Its loopback REST request
+uses the discovered plugin bearer token only inside the local machine.
+
+Filesystem fallback can read or write the allowlisted absolute vault path. It
+must not access `/`, `/home`, or a parent directory containing unrelated data.
+The package rejects absolute paths and traversal at the vault boundary.
+
+The package does not publish an MCP server, forward the vault over the network,
+or store the bearer token in source control.
+
+## Dependency and build policy
+
+- Keep direct MCP SDK dependencies pinned or bounded in `package.json`.
+- Run `npm test` and `npm run build` before releases.
+- Inspect `main.js` for unexpected dynamic code or new network behavior.
+- Review third-party dependency changes before merging.
 
 ## Vulnerability reporting
 
@@ -191,7 +142,7 @@ write vulnerability.
 Report suspected vulnerabilities privately to the repository maintainer with:
 
 - Affected version or commit.
-- Attack prerequisites.
+- Reproduction prerequisites.
 - Reproduction steps.
 - Impact.
 - Suggested remediation.

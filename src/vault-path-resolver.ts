@@ -5,6 +5,12 @@ export class VaultPathResolver {
   constructor(private readonly vaultPath: string) {}
 
   async resolve(relativePath: string, allowRoot = false): Promise<string> {
+    if (!this.vaultPath) {
+      throw new Error(
+        "Vault path unavailable. Set OBSIDIAN_VAULT_PATH or --vault to enable filesystem fallback.",
+      );
+    }
+
     const rawInput = relativePath.trim();
     if (
       rawInput.startsWith("/") ||

@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -23,13 +24,14 @@ const toolRegistry = new McpToolRegistry(router);
 
 const server = new McpServer(
   {
-    name: "a2rg-obsidian-mcp",
-    version: "1.0.5",
+    name: "@a2rg/obsidian-mcp",
+    version: "1.0.6",
   },
   {
     capabilities: {
       tools: {},
     },
+    jsonSchemaValidator: new CfWorkerJsonSchemaValidator(),
   },
 );
 
