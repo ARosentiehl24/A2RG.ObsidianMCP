@@ -146,7 +146,7 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
         items: [
           {
             name: "Bearer token",
-            desc: "Copy this value to OBSIDIAN_API_KEY in the MCP environment.",
+            desc: "Add this value as the bearer token in the MCP client's Authorization header.",
             control: {
               type: "text",
               key: "token",
@@ -174,6 +174,10 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
         type: "group",
         heading: "MCP setup",
         items: [
+          {
+            name: "Streamable HTTP endpoint",
+            desc: this.plugin.getMcpUrl(),
+          },
           {
             name: "Local certificate",
             desc: this.plugin.getTlsFingerprint()

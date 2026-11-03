@@ -5,7 +5,10 @@
 A2RG MCP Bridge is designed for a single desktop machine:
 
 ```text
-MCP client -> MCP stdio process -> 127.0.0.1 plugin bridge -> Obsidian
+MCP client -> HTTP/HTTPS /mcp endpoint -> plugin -> Obsidian
+
+Optional stdio fallback:
+MCP client -> stdio process -> 127.0.0.1 plugin bridge or vault filesystem
 ```
 
 The plugin server binds only to `127.0.0.1`. It must not be exposed directly
@@ -34,7 +37,9 @@ Protect the following values:
 - `plugin/data.json`: contains non-secret bridge settings.
 - `<Obsidian config directory>/plugins/mcp-vault-connector/cache/search-index-v1.json`: contains
   vault file names and posting metadata.
-- `.env`: contains `OBSIDIAN_API_KEY`.
+- `.env`: may contain `OBSIDIAN_API_KEY` for optional stdio mode.
+- HTTP MCP client configuration: contains the bearer token in the Authorization
+  header.
 - MCP client configuration: may contain environment values or secret references.
 - Shell history: may contain token values if commands are pasted insecurely.
 
@@ -67,11 +72,16 @@ without both authentication and TLS.
 There is no CORS or browser login flow. Bearer authentication alone is not
 enough for a public network endpoint.
 
-## Using HTTPS for a public server
+## Using HTTP and HTTPS MCP
 
-This repository does not expose an MCP HTTP server or implement public HTTPS.
-For a public deployment, HTTPS belongs at the external MCP server boundary,
-not in the loopback Obsidian plugin.
+The plugin exposes MCP at `/mcp` over loopback HTTP or HTTPS. HTTP is suitable
+for local testing and trusted loopback clients. HTTPS uses a generated
+self-signed certificate that clients must explicitly trust. Neither mode is
+intended for public network access.
+
+For a public deployment, HTTP or HTTPS belongs at an external MCP service
+boundary. The public service must implement authentication and use a publicly
+trusted certificate.
 
 Recommended architecture:
 
@@ -83,7 +93,7 @@ Public client
 
 Obsidian desktop
   -> loopback plugin bridge
-  -> MCP stdio client on the same desktop
+  -> local MCP client or optional stdio fallback
 ```
 
 Do not send desktop vault credentials to an untrusted remote server.

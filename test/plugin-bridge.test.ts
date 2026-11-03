@@ -159,6 +159,98 @@ test("HttpBridge rejects unauthorized requests and serves authenticated writes",
   }
 });
 
+test("HttpBridge exposes the registered tools through Streamable HTTP MCP", async () => {
+  const vault = new MemoryVault();
+  const bridge = new HttpBridge({
+    port: 0,
+    token: "test-token",
+    vault,
+  });
+
+  const address = await bridge.start();
+  const headers = {
+    Authorization: "Bearer test-token",
+    "Content-Type": "application/json",
+    Accept: "application/json, text/event-stream",
+  };
+
+  try {
+    const initialize = await fetch(`http://127.0.0.1:${address.port}/mcp`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          clientInfo: {
+            name: "plugin-test",
+            version: "1.0.5",
+          },
+        },
+      }),
+    });
+    assert.equal(initialize.status, 200);
+    assert.match(await initialize.text(), /"serverInfo"[\s\S]*"name":"a2rg-obsidian-mcp"/);
+
+    const tools = await fetch(`http://127.0.0.1:${address.port}/mcp`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/list",
+        params: {},
+      }),
+    });
+    assert.equal(tools.status, 200);
+    const toolText = await tools.text();
+    assert.match(toolText, /get_file/);
+    assert.match(toolText, /get_active_file/);
+
+    const write = await fetch(`http://127.0.0.1:${address.port}/mcp`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 3,
+        method: "tools/call",
+        params: {
+          name: "write_file",
+          arguments: {
+            path: "notes/mcp-http.md",
+            content: "Hello MCP HTTP",
+          },
+        },
+      }),
+    });
+    assert.equal(write.status, 200);
+    assert.match(await write.text(), /Archivo guardado exitosamente/);
+
+    const read = await fetch(`http://127.0.0.1:${address.port}/mcp`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 4,
+        method: "tools/call",
+        params: {
+          name: "get_file",
+          arguments: {
+            path: "notes/mcp-http.md",
+          },
+        },
+      }),
+    });
+    assert.equal(read.status, 200);
+    assert.match(await read.text(), /Hello MCP HTTP/);
+  } finally {
+    await bridge.stop();
+  }
+});
+
 test("HttpBridge serves HTTPS and ApiClient verifies the generated certificate", async () => {
   const tls = await generateLocalTlsCertificate();
   assert.match(tls.certificate, /BEGIN CERTIFICATE/);

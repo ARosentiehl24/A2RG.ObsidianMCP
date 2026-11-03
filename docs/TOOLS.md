@@ -1,7 +1,8 @@
 # MCP Tools
 
-The MCP server exposes eight stdio tools. Relative paths are vault-relative,
-not absolute filesystem paths.
+The MCP server exposes eight tools through Streamable HTTP at `/mcp` and
+through the optional stdio executable. Relative paths are vault-relative, not
+absolute filesystem paths.
 
 All tools return MCP text content. Search and list operations additionally
 serialize JSON in that text content.
@@ -22,8 +23,8 @@ Example:
 }
 ```
 
-The plugin bridge is preferred. The direct filesystem fallback reads from
-`OBSIDIAN_VAULT_PATH`.
+The Obsidian plugin bridge is preferred. The direct filesystem fallback reads
+from `OBSIDIAN_VAULT_PATH` only in stdio mode.
 
 ## `write_file`
 

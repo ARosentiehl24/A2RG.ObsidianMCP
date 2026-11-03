@@ -1,4 +1,3 @@
-import type { HybridRouter } from "./router.js";
 import {
   appendFileArgsSchema,
   deleteFileArgsSchema,
@@ -16,6 +15,17 @@ interface TextResult {
 }
 
 type ToolHandler = (args: unknown) => Promise<TextResult>;
+
+export interface McpToolRouter {
+  getFile(path: string): Promise<{ content: string; source: "api" | "filesystem" | "obsidian" }>;
+  writeFile(path: string, content: string): Promise<{ source: "api" | "filesystem" | "obsidian" }>;
+  appendFile(path: string, content: string): Promise<{ source: "api" | "filesystem" | "obsidian" }>;
+  deleteFile(path: string): Promise<{ source: "api" | "filesystem" | "obsidian" }>;
+  listFiles(directory?: string): Promise<Array<{ path: string; name: string; isDirectory: boolean; size?: number; mtime?: number }>>;
+  search(query: string, maxResults?: number): Promise<Array<{ path: string; matches: string[] }>>;
+  getGraphNeighbors(path: string, direction?: "incoming" | "outgoing" | "both", depth?: number, maxResults?: number): Promise<Array<{ path: string; depth: number; linkCount: number; direction: "incoming" | "outgoing" }>>;
+  getActiveFile(): Promise<{ content: string } | null>;
+}
 
 export class McpToolRegistry {
   private readonly tools = [
@@ -114,7 +124,7 @@ export class McpToolRegistry {
 
   private readonly handlers: Record<string, ToolHandler>;
 
-  constructor(private readonly router: HybridRouter) {
+  constructor(private readonly router: McpToolRouter) {
     this.handlers = {
       get_file: async (args) => {
         const { path } = getFileArgsSchema.parse(args);
