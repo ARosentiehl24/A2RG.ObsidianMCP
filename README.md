@@ -191,6 +191,29 @@ npm run benchmark:search -- 10000
 npm run benchmark:search -- 100000
 ```
 
+## Search benchmark
+
+The reproducible synthetic benchmark uses 10 relevance sets, known expected
+documents, and the same BM25 implementation used by the plugin and npm package.
+
+| Scale | Initial indexing | Cold query | Warm query | Incremental 1000 | Heap / RSS |
+|---:|---:|---:|---:|---:|---:|
+| 1,000 documents | 254 ms | 0.757 ms | 0.545 ms | 422 ms | 20.3 MB / 86.5 MB |
+| 10,000 documents | 490 ms | 8.953 ms | 7.728 ms | 42.2 ms | 53.8 MB / 138.9 MB |
+| 100,000 documents | 4.890 s | 79.854 ms | 81.186 ms | 31.2 ms | 273.7 MB / 580.9 MB |
+
+Measured metrics:
+
+- MRR@10: `1.0`
+- Recall@10: `1.0`
+- Recall@100: `1.0`
+- Gzip snapshot: `4.668 MB`
+- Test suite: `29` tests passing
+
+The benchmark proves indexed-search behavior and incremental updates, not
+semantic similarity from embeddings. It is useful for comparing future search
+implementations against a reproducible baseline.
+
 `npm test` runs the Bun test suite. `npm run build` type-checks both targets,
 bundles `main.js`, and compiles `dist/a2rg-obsidian-mcp`.
 
