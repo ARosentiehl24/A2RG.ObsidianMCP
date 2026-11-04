@@ -4,7 +4,7 @@ A2RG MCP Bridge connects MCP clients to an open Obsidian vault through a local
 desktop plugin. It exposes eight vault tools through Streamable HTTP MCP and
 keeps an optional Bun stdio process for filesystem fallback.
 
-Current release: `1.0.8`.
+Current release: `1.0.9`.
 
 ## Components
 
@@ -68,7 +68,10 @@ supports local certificate trust.
    }
    ```
 
-Use `https://127.0.0.1:27125/mcp` when local HTTPS is enabled.
+Direct HTTPS uses `https://127.0.0.1:27125/mcp`. Trust the plugin certificate
+before connecting. The certificate and private key persist across Obsidian
+reloads and restarts. Use **Regenerate local TLS certificate** in plugin
+settings only when you intentionally replace that identity.
 
 HTTP MCP does not require `OBSIDIAN_VAULT_PATH`, `OBSIDIAN_CONFIG_DIR`,
 `OBSIDIAN_API_KEY`, `OBSIDIAN_API_URL`, a `command`, or an executable path.
@@ -168,6 +171,7 @@ auto-discovery, CLI flags, cache behavior, and publication.
 - [Security and Public Deployment](docs/SECURITY.md)
 - [npm and pnpm Package](docs/NPM.md)
 - [Contributing](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
 
 ## Development
 
@@ -177,6 +181,14 @@ npm run dev:mcp
 npm run dev:plugin
 npm run build:npm
 npm run build
+```
+
+Run synthetic search benchmarks:
+
+```bash
+npm run benchmark:search -- 1000
+npm run benchmark:search -- 10000
+npm run benchmark:search -- 100000
 ```
 
 `npm test` runs the Bun test suite. `npm run build` type-checks both targets,

@@ -143,7 +143,37 @@ With a local binary:
 }
 ```
 
-The package has no public HTTP mode. Use the plugin directly for HTTP or HTTPS:
+With pnpm:
+
+```json
+{
+  "mcpServers": {
+    "obsidian": {
+      "type": "stdio",
+      "command": "pnpm",
+      "args": ["dlx", "@a2rg/obsidian-mcp"]
+    }
+  }
+}
+```
+
+The package has no public HTTP mode. Use the plugin directly for HTTP:
+
+```json
+{
+  "mcpServers": {
+    "obsidian": {
+      "type": "http",
+      "url": "http://127.0.0.1:27125/mcp",
+      "headers": {
+        "Authorization": "Bearer <64-character-plugin-token>"
+      }
+    }
+  }
+}
+```
+
+For HTTPS:
 
 ```json
 {
@@ -193,10 +223,16 @@ The package:
 - Uses the same search and file tools as the plugin.
 - Persists stdio search snapshots under the discovered vault's
   `OBSIDIAN_CONFIG_DIR/plugins/mcp-vault-connector/cache/`.
+- Uses BM25 term-frequency ranking with name and content fields.
+- Uses compact BM25 term postings and token trigrams for candidate discovery.
 - Keeps an in-memory search index and caches search results for 60 seconds.
+- Persists and restores up to 128 recent query results between stdio restarts.
+- Stores the BM25 snapshot as a gzip-compressed `search-index-v3.json.gz`.
+- Loads the persistent snapshot before reconciliation and searches cached candidates immediately.
+- Reconciles changed, deleted, and new files in the background.
 - Keeps append idempotency results for five minutes.
 - Does not keep MCP sessions: each HTTP request remains stateless.
-- Reopens or rebuilds local indexes when the stdio process starts.
+- Loads the compressed snapshot before reconciliation when the stdio process starts.
 
 The Community Plugin has the same search behavior and its own index snapshot
 inside the vault plugin directory.

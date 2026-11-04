@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { gunzipSync, gzipSync } from "node:zlib";
 import type { TextSearchIndex, TextSearchSnapshot } from "./search-index.js";
 
 export class PersistentSearchCache {
@@ -23,8 +24,8 @@ export class PersistentSearchCache {
         return false;
       }
 
-      const raw = await fs.readFile(this.cachePath, "utf-8");
-      const parsed: unknown = JSON.parse(raw);
+      const raw = await fs.readFile(this.cachePath);
+      const parsed: unknown = JSON.parse(gunzipSync(raw).toString("utf-8"));
       if (!isTextSearchSnapshot(parsed)) {
         return false;
       }
@@ -42,10 +43,14 @@ export class PersistentSearchCache {
       await fs.chmod(cacheDirectory, 0o700).catch(() => undefined);
 
       const temporaryPath = `${this.cachePath}.tmp`;
+      const compressed = gzipSync(
+        Buffer.from(JSON.stringify(index.toSnapshot()), "utf-8"),
+        { level: 6 },
+      );
       await fs.writeFile(
         temporaryPath,
-        JSON.stringify(index.toSnapshot()),
-        { encoding: "utf-8", mode: 0o600 },
+        compressed,
+        { mode: 0o600 },
       );
       await fs.chmod(temporaryPath, 0o600);
       await fs.rename(temporaryPath, this.cachePath);
@@ -68,14 +73,22 @@ function isTextSearchSnapshot(value: unknown): value is TextSearchSnapshot {
   const bigrams = readProperty(value, "bigrams");
   const nameTrigrams = readProperty(value, "nameTrigrams");
   const nameBigrams = readProperty(value, "nameBigrams");
+  const termPostings = readProperty(value, "termPostings");
+  const documentLengths = readProperty(value, "documentLengths");
+  const nameTermPostings = readProperty(value, "nameTermPostings");
+  const nameDocumentLengths = readProperty(value, "nameDocumentLengths");
   const queryCache = readProperty(value, "queryCache");
 
-  return version === 1
+  return version === 3
     && Array.isArray(documents)
     && Array.isArray(trigrams)
     && Array.isArray(bigrams)
     && Array.isArray(nameTrigrams)
     && Array.isArray(nameBigrams)
+    && Array.isArray(termPostings)
+    && Array.isArray(documentLengths)
+    && Array.isArray(nameTermPostings)
+    && Array.isArray(nameDocumentLengths)
     && Array.isArray(queryCache);
 }
 

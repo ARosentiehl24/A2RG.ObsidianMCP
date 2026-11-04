@@ -1,4 +1,5 @@
 import { constants as fsConstants } from "node:fs";
+import type { Dirent } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {
@@ -9,6 +10,7 @@ import type { McpVaultPort } from "./ports.js";
 import { PersistentSearchCache } from "./persistent-search-cache.js";
 import {
   extractMatchingLines,
+  matchesSearchQuery,
   normalizeSearchText,
   TextSearchIndex,
 } from "./search-index.js";
@@ -22,6 +24,25 @@ export interface FileItem {
   mtime?: number;
 }
 
+async function mapWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  handler: (item: T) => Promise<void>,
+): Promise<void> {
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(concurrency, 1), items.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (nextIndex < items.length) {
+      const item = items[nextIndex];
+      nextIndex += 1;
+      if (item !== undefined) {
+        await handler(item);
+      }
+    }
+  });
+  await Promise.all(workers);
+}
+
 export class VaultManager implements McpVaultPort {
   private readonly vaultPath: string;
   private readonly pathResolver: VaultPathResolver;
@@ -29,6 +50,7 @@ export class VaultManager implements McpVaultPort {
   private readonly searchCache: PersistentSearchCache | null;
   private searchIndexReady = false;
   private searchIndexPromise: Promise<void> | null = null;
+  private reconciliationPromise: Promise<void> | null = null;
   private searchCacheSaveTimer: NodeJS.Timeout | null = null;
 
   constructor(vaultPath: string, configDirPath?: string) {
@@ -41,7 +63,7 @@ export class VaultManager implements McpVaultPort {
             "plugins",
             "mcp-vault-connector",
             "cache",
-            "search-index-v1.json",
+            "search-index-v3.json.gz",
           ),
         )
       : null;
@@ -166,7 +188,14 @@ export class VaultManager implements McpVaultPort {
       return cached;
     }
 
-    const candidates = this.searchIndex.findCandidates(normalizedQuery, limit * 4);
+    let candidates = this.searchIndex.findCandidates(normalizedQuery, limit * 4);
+    if (
+      candidates.length === 0
+      && this.reconciliationPromise !== null
+    ) {
+      await this.reconciliationPromise;
+      candidates = this.searchIndex.findCandidates(normalizedQuery, limit * 4);
+    }
     const results: { path: string; matches: string[] }[] = [];
 
     for (const relativePath of candidates) {
@@ -191,10 +220,11 @@ export class VaultManager implements McpVaultPort {
           );
         }
 
-        const nameMatches = normalizeSearchText(path.basename(relativePath))
-          .includes(normalizedQuery);
-        const contentMatches = normalizeSearchText(content)
-          .includes(normalizedQuery);
+        const nameMatches = matchesSearchQuery(
+          path.basename(relativePath),
+          normalizedQuery,
+        );
+        const contentMatches = matchesSearchQuery(content, normalizedQuery);
         if (!nameMatches && !contentMatches) {
           continue;
         }
@@ -230,10 +260,24 @@ export class VaultManager implements McpVaultPort {
   }
 
   private async rebuildSearchIndex(): Promise<void> {
-    this.searchIndex.clear();
-    await this.searchCache?.load(this.searchIndex);
-    const currentPaths = new Set<string>();
+    const cacheLoaded = await this.searchCache?.load(this.searchIndex) ?? false;
+    this.searchIndexReady = true;
+    if (this.reconciliationPromise === null) {
+      this.reconciliationPromise = cacheLoaded
+        ? new Promise<void>((resolve) => {
+            setNodeTimeout(() => {
+              void this.reconcileSearchIndex().then(resolve);
+            }, 500);
+          })
+        : this.reconcileSearchIndex();
+      void this.reconciliationPromise.finally(() => {
+        this.reconciliationPromise = null;
+      });
+    }
+  }
 
+  private async reconcileSearchIndex(): Promise<void> {
+    const currentPaths = new Set<string>();
     await this.indexDirectory(this.vaultPath, currentPaths);
 
     for (const stalePath of this.searchIndex.getDocumentPaths()) {
@@ -242,7 +286,6 @@ export class VaultManager implements McpVaultPort {
       }
     }
 
-    this.searchIndexReady = true;
     await this.searchCache?.save(this.searchIndex);
   }
 
@@ -253,6 +296,9 @@ export class VaultManager implements McpVaultPort {
     const entries = await fs.readdir(directory, { withFileTypes: true })
       .catch(() => []);
 
+    const directories: string[] = [];
+    const files: Array<{ entry: Dirent; fullPath: string }> = [];
+
     for (const entry of entries) {
       if (entry.name.startsWith(".") || entry.isSymbolicLink()) {
         continue;
@@ -260,7 +306,7 @@ export class VaultManager implements McpVaultPort {
 
       const fullPath = path.join(directory, entry.name);
       if (entry.isDirectory()) {
-        await this.indexDirectory(fullPath, currentPaths);
+        directories.push(fullPath);
         continue;
       }
       if (
@@ -269,7 +315,14 @@ export class VaultManager implements McpVaultPort {
       ) {
         continue;
       }
+      files.push({ entry, fullPath });
+    }
 
+    for (const subdirectory of directories) {
+      await this.indexDirectory(subdirectory, currentPaths);
+    }
+
+    await mapWithConcurrency(files, 8, async ({ entry, fullPath }) => {
       try {
         const relativePath = path.relative(this.vaultPath, fullPath)
           .replace(/\\/g, "/");
@@ -281,7 +334,7 @@ export class VaultManager implements McpVaultPort {
           indexed?.mtimeMs === stats.mtimeMs &&
           indexed.sizeBytes === stats.size
         ) {
-          continue;
+          return;
         }
 
         const content = await this.readFileNoFollow(fullPath);
@@ -295,7 +348,7 @@ export class VaultManager implements McpVaultPort {
       } catch {
         // Ignore unreadable files.
       }
-    }
+    });
   }
 
   private async updateSearchDocument(

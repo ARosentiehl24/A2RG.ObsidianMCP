@@ -1,6 +1,6 @@
 {
   "name": "@a2rg/obsidian-mcp",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "MCP stdio package for Obsidian with plugin-first REST access and automatic local filesystem fallback",
   "type": "module",
   "main": "./dist/npm/cli.js",
@@ -40,6 +40,7 @@
     "dev": "npm run dev:mcp",
     "dev:mcp": "bun --watch src/index.ts",
     "dev:plugin": "node esbuild.config.mjs",
+    "benchmark:search": "npm run build:npm && node benchmark-synthetic-scales.mjs",
     "test": "bun test test/*.test.ts"
   },
   "keywords": [

@@ -3,7 +3,7 @@
 This guide configures Streamable HTTP MCP first. The stdio executable is only
 an optional fallback.
 
-Current release: `1.0.8`.
+Current release: `1.0.9`.
 
 ## 1. Requirements
 
@@ -75,6 +75,22 @@ For HTTP:
 For HTTPS, use `https://127.0.0.1:27125/mcp` and configure the client to trust
 the certificate PEM displayed or exported by the plugin.
 
+Example:
+
+```json
+{
+  "mcpServers": {
+    "obsidian": {
+      "type": "http",
+      "url": "https://127.0.0.1:27125/mcp",
+      "headers": {
+        "Authorization": "Bearer <64-character-plugin-token>"
+      }
+    }
+  }
+}
+```
+
 No `command`, executable path, vault path, `OBSIDIAN_API_KEY`,
 `OBSIDIAN_VAULT_PATH`, or `OBSIDIAN_CONFIG_DIR` is required for HTTP MCP.
 
@@ -138,6 +154,20 @@ Configure an MCP client as stdio:
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@a2rg/obsidian-mcp"]
+    }
+  }
+}
+```
+
+With pnpm:
+
+```json
+{
+  "mcpServers": {
+    "obsidian": {
+      "type": "stdio",
+      "command": "pnpm",
+      "args": ["dlx", "@a2rg/obsidian-mcp"]
     }
   }
 }

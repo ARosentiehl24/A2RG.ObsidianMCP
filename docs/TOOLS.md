@@ -80,18 +80,41 @@ Searches note names and Markdown or text content.
 {"query":"meeting","limit":50}
 ```
 
-The plugin maintains an in-memory trigram and bigram posting index for names,
-Markdown content, headings, tags, and frontmatter. Search results are ranked
-by resolved incoming-link count when available.
+The plugin maintains an in-memory BM25 index for names, Markdown content,
+headings, tags, and frontmatter. It uses term frequencies and document
+frequencies to rank files rather than returning only insertion-order matches.
+
+It keeps compact token trigrams for candidate discovery and accent-insensitive
+matching. Search text is normalized with Unicode-compatible lowercase and
+diacritic removal.
+
+Plugin bridge results use BM25 ranking first and resolved incoming-link count
+as a secondary tie-break signal. Stdio fallback uses the same BM25 ranking
+without resolved Obsidian link metadata.
 
 The plugin persists an index snapshot under:
 
 ```text
-<Obsidian config directory>/plugins/mcp-vault-connector/cache/search-index-v1.json
+<Obsidian config directory>/plugins/mcp-vault-connector/cache/search-index-v3.json.gz
 ```
 
 The snapshot stores document metadata and posting maps, not complete note
 content or search-result payloads.
+
+On startup, the search loads the snapshot first and reconciles changes in the
+background. Cached candidates return immediately; searches not present in the
+snapshot wait until reconciliation discovers candidates before returning.
+
+For capacity validation, run:
+
+```bash
+npm run benchmark:search -- 1000
+npm run benchmark:search -- 10000
+npm run benchmark:search -- 100000
+```
+
+The benchmark measures initial indexing, cold and warm queries, incremental
+indexing of 1000 documents, snapshot size, precision, recall, heap and RSS.
 
 ## `get_linked_notes`
 
@@ -174,7 +197,7 @@ Obsidian closed or bridge unavailable
 | Operation | Bridge unavailable |
 |---|---|
 | `get_file` | Read through `OBSIDIAN_VAULT_PATH`. |
-| `search_vault` | Search the fallback trigram/bigram index. |
+| `search_vault` | Search the fallback BM25 index. |
 | `list_files` | List direct children from the filesystem. |
 | `write_file` | Write to the filesystem unless REST status is ambiguous. |
 | `append_file` | Append unless REST status is ambiguous or timed out. |

@@ -6,15 +6,36 @@ import {
 } from "obsidian";
 import {
   extractMatchingLines,
+  matchesSearchQuery,
   normalizeSearchText,
   TextSearchIndex,
 } from "../../../src/search-index";
 import type { VaultSearchMatch } from "../ports/vault-port";
 
+async function mapWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  handler: (item: T) => Promise<void>,
+): Promise<void> {
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(concurrency, 1), items.length);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (nextIndex < items.length) {
+      const item = items[nextIndex];
+      nextIndex += 1;
+      if (item !== undefined) {
+        await handler(item);
+      }
+    }
+  });
+  await Promise.all(workers);
+}
+
 export class ObsidianSearchService {
   private readonly searchIndex = new TextSearchIndex();
   private searchIndexReady = false;
   private searchIndexPromise: Promise<void> | null = null;
+  private reconciliationPromise: Promise<void> | null = null;
   private readonly incomingLinkCounts = new Map<string, number>();
 
   constructor(
@@ -102,9 +123,22 @@ export class ObsidianSearchService {
       return cached;
     }
 
-    const candidates = this.searchIndex.findCandidates(
+    let candidates = this.searchIndex.findCandidates(
       normalizedQuery,
       limit * 4,
+    );
+    if (
+      candidates.length === 0
+      && this.reconciliationPromise !== null
+    ) {
+      await this.reconciliationPromise;
+      candidates = this.searchIndex.findCandidates(
+        normalizedQuery,
+        limit * 4,
+      );
+    }
+    const candidateRanks = new Map(
+      candidates.map((candidate, index) => [candidate, index]),
     );
     const results: VaultSearchMatch[] = [];
 
@@ -130,10 +164,11 @@ export class ObsidianSearchService {
         content,
         this.app.metadataCache.getFileCache(file),
       );
-      const nameMatches = normalizeSearchText(file.name)
-        .includes(normalizedQuery);
-      const contentMatches = normalizeSearchText(searchableContent)
-        .includes(normalizedQuery);
+      const nameMatches = matchesSearchQuery(file.name, normalizedQuery);
+      const contentMatches = matchesSearchQuery(
+        searchableContent,
+        normalizedQuery,
+      );
       if (!nameMatches && !contentMatches) {
         continue;
       }
@@ -149,10 +184,13 @@ export class ObsidianSearchService {
     }
 
     const rankedResults = results
-      .sort((left, right) =>
-        (right.backlinks ?? 0) - (left.backlinks ?? 0)
-        || left.path.localeCompare(right.path),
-      )
+      .sort((left, right) => {
+        const leftRank = candidateRanks.get(left.path) ?? Number.MAX_SAFE_INTEGER;
+        const rightRank = candidateRanks.get(right.path) ?? Number.MAX_SAFE_INTEGER;
+        return leftRank - rightRank
+          || (right.backlinks ?? 0) - (left.backlinks ?? 0)
+          || left.path.localeCompare(right.path);
+      })
       .slice(0, limit);
 
     this.searchIndex.setCachedResults(cacheKey, rankedResults);
@@ -185,9 +223,17 @@ export class ObsidianSearchService {
   }
 
   private async rebuildSearchIndex(): Promise<void> {
-    this.searchIndex.clear();
     this.searchIndexReady = true;
-    await this.indexKnownFiles();
+    if (this.reconciliationPromise === null) {
+      this.reconciliationPromise = new Promise<void>((resolve) => {
+        setTimeout(() => {
+          void this.indexKnownFiles().then(resolve);
+        }, 500);
+      });
+      void this.reconciliationPromise.finally(() => {
+        this.reconciliationPromise = null;
+      });
+    }
   }
 
   private async indexFile(
@@ -237,29 +283,16 @@ export class ObsidianSearchService {
   }
 
   private async indexKnownFiles(): Promise<void> {
-    const paths = new Set<string>();
-    const activeFile = this.app.workspace.getActiveFile();
-    if (activeFile instanceof TFile) {
-      paths.add(activeFile.path);
-    }
-
-    for (const [sourcePath, targets] of Object.entries(
-      this.app.metadataCache.resolvedLinks,
-    )) {
-      paths.add(sourcePath);
-      for (const targetPath of Object.keys(targets)) {
-        paths.add(targetPath);
+    const files = this.app.vault.getMarkdownFiles();
+    await mapWithConcurrency(files, 8, async (file) => {
+      await this.indexFile(file);
+    });
+    const currentPaths = new Set(files.map((file) => file.path));
+    for (const stalePath of this.searchIndex.getDocumentPaths()) {
+      if (!currentPaths.has(stalePath)) {
+        this.searchIndex.removeDocument(stalePath);
       }
     }
-
-    await Promise.all(
-      Array.from(paths).map(async (filePath) => {
-        const file = this.app.vault.getAbstractFileByPath(filePath);
-        if (file instanceof TFile && this.isSearchableFile(file)) {
-          await this.indexFile(file);
-        }
-      }),
-    );
   }
 
   private countIncomingLinks(filePath: string): number {

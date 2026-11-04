@@ -14,7 +14,7 @@ interface CliOptions {
   version: boolean;
 }
 
-const PACKAGE_VERSION = "1.0.8";
+const PACKAGE_VERSION = "1.0.9";
 
 function usage(): string {
   return `obsidian-mcp ${PACKAGE_VERSION}

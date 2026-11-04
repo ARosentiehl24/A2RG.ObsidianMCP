@@ -1,11 +1,10 @@
 {
   "mcpServers": {
     "obsidian": {
-      "type": "http",
-      "url": "https://127.0.0.1:27125/mcp",
-      "headers": {
-        "Authorization": "Bearer ${OBSIDIAN_MCP_TOKEN}"
-      }
+      "command": "node",
+      "args": [
+        "/home/a2rg/.copilot/repos/A2RG.ObsidianMCP/dist/npm/cli.js"
+      ]
     }
   }
 }

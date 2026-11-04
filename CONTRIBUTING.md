@@ -30,6 +30,14 @@ node dist/npm/cli.js --discover
 npm pack --dry-run
 ```
 
+Run the reproducible search benchmark:
+
+```bash
+npm run benchmark:search -- 1000
+npm run benchmark:search -- 10000
+npm run benchmark:search -- 100000
+```
+
 ## Development workflows
 
 Run the stdio server:
