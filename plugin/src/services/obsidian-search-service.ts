@@ -226,7 +226,7 @@ export class ObsidianSearchService {
     this.searchIndexReady = true;
     if (this.reconciliationPromise === null) {
       this.reconciliationPromise = new Promise<void>((resolve) => {
-        setTimeout(() => {
+        window.setTimeout(() => {
           void this.indexKnownFiles().then(resolve);
         }, 500);
       });

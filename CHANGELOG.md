@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.0.10 - 2026-11-03
+
+- Fixed popout-window compatibility by using `window.setTimeout()` for deferred
+  search reconciliation.
+- Removed unused `serializePostings` code.
+- Documented vault enumeration and its authentication, traversal, and
+  hidden-directory safeguards.
+- Preserved HTTP/HTTPS, stdio fallback, persistent TLS, BM25 search, and
+  incremental indexing behavior.
+
+## Unreleased
+
+- Used `window.setTimeout()` for deferred plugin search reconciliation to
+  preserve compatibility with Obsidian popout windows.
+- Removed the unused `serializePostings` function.
+- Documented vault enumeration for `list_files` and `search_vault`, including
+  authentication, hidden-path, traversal, and write safeguards.
+
 ## 1.0.9 - 2026-11-03
 
 - Replaced the slow full-document-indexing behavior with a cache-first, lazy
