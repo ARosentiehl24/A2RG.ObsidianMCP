@@ -83,6 +83,11 @@ The plugin starts a server only on `127.0.0.1` (localhost). It does not expose
 the vault to the public internet, send vault content to a remote service,
 collect telemetry, or include dynamic advertising.
 
+The plugin enumerates vault file paths only to implement `list_files` and
+`search_vault`. It returns relative paths and matching snippets after bearer
+authentication, skips hidden directories and symlinks, and rejects absolute or
+traversal paths.
+
 Every `/mcp` and REST request requires a generated bearer token. HTTP is
 available for trusted loopback testing; HTTPS is recommended. The optional npm
 stdio package can access only the discovered local vault when the bridge is

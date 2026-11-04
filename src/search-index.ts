@@ -510,12 +510,6 @@ export class TextSearchIndex {
   }
 }
 
-function serializePostings(
-  postings: Map<string, Set<string>>,
-): Array<[string, string[]]> {
-  return Array.from(postings, ([gram, paths]) => [gram, Array.from(paths)]);
-}
-
 function serializeTermPostings(
   postings: Map<string, Map<string, number>>,
 ): Array<[string, Array<[string, number]>]> {
