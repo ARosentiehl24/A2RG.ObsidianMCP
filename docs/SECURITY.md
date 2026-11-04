@@ -46,6 +46,20 @@ Protect:
 - MCP client configuration and environment values.
 - Shell history and issue screenshots.
 
+## Vault enumeration disclosure
+
+The plugin enumerates vault files for `list_files` and `search_vault`. It returns
+relative paths and search snippets only after an authenticated loopback
+request. The plugin does not upload paths or content to remote services.
+
+Vault enumeration is limited by:
+
+- Markdown/text search allowlists.
+- Relative-path traversal rejection.
+- Hidden-directory filtering.
+- The bearer token required for `/mcp` and REST endpoints.
+- User-controlled operations for file writes and deletes.
+
 Do not place bearer tokens or private keys in Markdown notes, source control,
 issue reports, screenshots, or public documentation.
 

@@ -25,7 +25,7 @@ const toolRegistry = new McpToolRegistry(router);
 const server = new McpServer(
   {
     name: "@a2rg/obsidian-mcp",
-    version: "1.0.9",
+    version: "1.0.10",
   },
   {
     capabilities: {
