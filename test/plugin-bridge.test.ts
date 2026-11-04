@@ -3,7 +3,10 @@ import test from "node:test";
 import { ApiClient } from "../src/api";
 import { HttpBridge } from "../plugin/src/bridge/http-bridge";
 import { VaultPort, VaultSearchMatch } from "../plugin/src/ports/vault-port";
-import { generateLocalTlsCertificate } from "../plugin/src/tls/local-certificate";
+import {
+  generateLocalTlsCertificate,
+  restoreLocalTlsMaterial,
+} from "../plugin/src/tls/local-certificate";
 
 class MemoryVault implements VaultPort {
   private files = new Map<string, string>();
@@ -187,7 +190,7 @@ test("HttpBridge exposes the registered tools through Streamable HTTP MCP", asyn
           capabilities: {},
           clientInfo: {
             name: "plugin-test",
-            version: "1.0.8",
+            version: "1.0.9",
           },
         },
       }),
@@ -249,6 +252,27 @@ test("HttpBridge exposes the registered tools through Streamable HTTP MCP", asyn
   } finally {
     await bridge.stop();
   }
+});
+
+test("Persistent TLS material restores only matching certificate and key", async () => {
+  const first = await generateLocalTlsCertificate();
+  const restored = restoreLocalTlsMaterial(
+    first.certificate,
+    first.privateKey,
+    first.fingerprint,
+  );
+  assert.equal(restored?.certificate, first.certificate);
+  assert.equal(restored?.privateKey, first.privateKey);
+
+  const second = await generateLocalTlsCertificate();
+  assert.equal(
+    restoreLocalTlsMaterial(
+      first.certificate,
+      second.privateKey,
+      first.fingerprint,
+    ),
+    null,
+  );
 });
 
 test("HttpBridge serves HTTPS and ApiClient verifies the generated certificate", async () => {

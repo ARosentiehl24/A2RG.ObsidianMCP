@@ -13,6 +13,7 @@ export interface BridgeSettings {
   tlsEnabled: boolean;
   tlsFingerprint: string;
   tlsCertificate: string;
+  tlsPrivateKey: string;
   configDir: string;
 }
 
@@ -23,6 +24,7 @@ export const DEFAULT_SETTINGS: BridgeSettings = {
   tlsEnabled: false,
   tlsFingerprint: "",
   tlsCertificate: "",
+  tlsPrivateKey: "",
   configDir: "",
 };
 
@@ -37,6 +39,7 @@ export function sanitizeBridgeSettings(value: unknown): BridgeSettings {
   const tlsEnabled = readProperty(value, "tlsEnabled");
   const tlsFingerprint = readProperty(value, "tlsFingerprint");
   const tlsCertificate = readProperty(value, "tlsCertificate");
+  const tlsPrivateKey = readProperty(value, "tlsPrivateKey");
   const token = readProperty(value, "token");
   const configDir = readProperty(value, "configDir");
 
@@ -63,6 +66,10 @@ export function sanitizeBridgeSettings(value: unknown): BridgeSettings {
       typeof tlsCertificate === "string"
         ? tlsCertificate
         : defaults.tlsCertificate,
+    tlsPrivateKey:
+      typeof tlsPrivateKey === "string"
+        ? tlsPrivateKey
+        : defaults.tlsPrivateKey,
     configDir:
       typeof configDir === "string"
         ? configDir
@@ -193,7 +200,8 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
             visible: () => this.plugin.isTlsEnabled(),
           },
           {
-            name: "Generate a replacement certificate",
+            name: "Regenerate local TLS certificate",
+            desc: "Creates a new persistent certificate and requires re-trusting it in MCP clients.",
             visible: () => this.plugin.isTlsEnabled(),
             action: () => {
               void (async () => {
@@ -218,7 +226,7 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
         items: [
           {
             name: "Local-only bridge",
-            desc: "The bridge listens only on 127.0.0.1. The bearer token stays in Obsidian plugin data; the generated private key is held in memory.",
+            desc: "The bridge listens only on 127.0.0.1. The bearer token and persistent TLS private key stay in Obsidian plugin data.",
           },
           {
             name: "Bearer token access",
@@ -257,10 +265,9 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
           this.plugin.settings.tlsEnabled = value;
           try {
             if (value) {
-              await this.plugin.generateTlsCertificate();
-            } else {
-              await this.plugin.saveSettings();
+              await this.plugin.ensureTlsCertificate();
             }
+            await this.plugin.saveSettings();
           } catch (error: unknown) {
             const message =
               error instanceof Error ? error.message : String(error);

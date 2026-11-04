@@ -11,6 +11,7 @@ import {
 import {
   generateLocalTlsCertificate,
   LocalTlsMaterial,
+  restoreLocalTlsMaterial,
 } from "./tls/local-certificate";
 
 export default class A2rgMcpBridgePlugin extends Plugin {
@@ -121,7 +122,15 @@ export default class A2rgMcpBridgePlugin extends Plugin {
     this.tlsMaterial = material;
     this.settings.tlsCertificate = material.certificate;
     this.settings.tlsFingerprint = material.fingerprint;
+    this.settings.tlsPrivateKey = material.privateKey;
     await this.saveSettings();
+    new Notice(
+      "Local TLS certificate regenerated. Re-trust the certificate in MCP clients.",
+    );
+  }
+
+  async ensureTlsCertificate(): Promise<void> {
+    await this.ensureTlsMaterial();
   }
 
   async readTlsCertificate(): Promise<string> {
@@ -196,10 +205,20 @@ export default class A2rgMcpBridgePlugin extends Plugin {
     if (this.tlsMaterial) {
       return this.tlsMaterial;
     }
+    const restored = restoreLocalTlsMaterial(
+      this.settings.tlsCertificate,
+      this.settings.tlsPrivateKey,
+      this.settings.tlsFingerprint,
+    );
+    if (restored) {
+      this.tlsMaterial = restored;
+      return restored;
+    }
     const material = await generateLocalTlsCertificate();
     this.tlsMaterial = material;
     this.settings.tlsCertificate = material.certificate;
     this.settings.tlsFingerprint = material.fingerprint;
+    this.settings.tlsPrivateKey = material.privateKey;
     await this.saveData({ ...this.settings });
     return material;
   }

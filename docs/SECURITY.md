@@ -54,8 +54,17 @@ issue reports, screenshots, or public documentation.
 HTTP is supported only for trusted loopback testing. HTTPS is recommended and
 uses a generated self-signed certificate that clients must explicitly trust.
 
-The plugin private key is held in plugin process memory. The public certificate
-and related settings are stored in plugin data.
+The local TLS certificate and matching private key are persisted in plugin
+`data.json`. The plugin restores this pair after Obsidian reloads or restarts,
+so clients do not need to trust a newly generated certificate each time.
+
+Protect `data.json` like a secret:
+
+- The private key grants HTTPS server identity only for loopback access.
+- It does not grant bearer-token access or vault read/write permissions.
+- Backups containing `data.json` must remain encrypted and restricted.
+- Regenerating the certificate requires installing/trusting the new certificate
+  once in each HTTPS MCP client.
 
 Do not use SSH forwarding or reverse proxies to publish:
 

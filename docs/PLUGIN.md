@@ -2,7 +2,7 @@
 
 Community plugin ID: `mcp-vault-connector`
 
-Current manifest version: `1.0.8`
+Current manifest version: `1.0.9`
 
 ## Responsibilities
 
@@ -42,7 +42,12 @@ Settings are stored in:
 ```
 
 Do not commit or share `data.json`, the bearer token, or the generated private
-key material.
+key material. The TLS certificate and private key are persisted together so
+Obsidian restarts reuse the same local HTTPS identity.
+
+Use **Regenerate local TLS certificate** in plugin settings only when the
+certificate must be replaced. Regeneration restarts the bridge and requires
+re-trusting the new certificate in each MCP client.
 
 The settings page provides:
 

@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, symlink } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
+import { gunzipSync } from "node:zlib";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -93,6 +101,31 @@ test("TextSearchIndex returns only posting candidates and updates documents", ()
   assert.deepEqual(index.findCandidates("updated"), []);
 });
 
+test("TextSearchIndex ranks BM25 matches and ignores accents", () => {
+  const index = new TextSearchIndex();
+  index.setDocument(
+    "notes/general.md",
+    "General",
+    "articulos sobre noticias y tecnologia",
+  );
+  index.setDocument(
+    "notes/claude.md",
+    "Claude Opus",
+    "Noticias de inteligencia artificial. Claude Opus publica novedades.",
+  );
+  index.setDocument(
+    "notes/platform.md",
+    "Platform",
+    "descripcion de una plataforma de noticias",
+  );
+
+  const ranked = index.findCandidates("noticias claude", 20);
+  assert.equal(ranked[0], "notes/claude.md");
+
+  const accentInsensitive = index.findCandidates("tecnología", 20);
+  assert.equal(accentInsensitive[0], "notes/general.md");
+});
+
 test("TextSearchIndex persists postings, metadata and complete results", () => {
   const index = new TextSearchIndex();
   index.setDocument(
@@ -114,16 +147,16 @@ test("TextSearchIndex persists postings, metadata and complete results", () => {
     ["notes/persistent.md"],
   );
   assert.equal(restored.getDocument("notes/persistent.md")?.sizeBytes, 42);
-  assert.equal(
+  assert.deepEqual(
     restored.getCachedResults("durable search:20"),
-    undefined,
+    [{ path: "notes/persistent.md", matches: ["durable search cache"] }],
   );
 });
 
 test("TextSearchIndex rejects unsafe restored documents and postings", () => {
   const index = new TextSearchIndex();
   index.restoreSnapshot({
-    version: 1,
+    version: 3,
     documents: [
       {
         path: "../secret.md",
@@ -140,6 +173,10 @@ test("TextSearchIndex rejects unsafe restored documents and postings", () => {
     bigrams: [["se", ["../secret.md"]]],
     nameTrigrams: [["sec", ["../secret.md"]]],
     nameBigrams: [["se", ["../secret.md"]]],
+    termPostings: [["secret", [["../secret.md", 1]]]],
+    documentLengths: [["../secret.md", 1]],
+    nameTermPostings: [["secret", [["../secret.md", 1]]]],
+    nameDocumentLengths: [["../secret.md", 1]],
     queryCache: [
       {
         key: "secret:20",
@@ -180,17 +217,49 @@ test("VaultManager persists and reloads the search snapshot", async () => {
       "plugins",
       "mcp-vault-connector",
       "cache",
-      "search-index-v1.json",
+      "search-index-v3.json.gz",
     );
     await new Promise((resolve) => setTimeout(resolve, 300));
-    const snapshot = JSON.parse(await readFile(cachePath, "utf-8"));
-    assert.equal(snapshot.version, 1);
+    const snapshot = JSON.parse(
+      gunzipSync(await readFile(cachePath)).toString("utf-8"),
+    );
+    assert.equal(snapshot.version, 3);
     assert.ok(Array.isArray(snapshot.documents));
 
     const reloaded = new VaultManager(directory, configDir);
     assert.deepEqual(
       (await reloaded.searchFiles("persistent cache")).map((match) => match.path),
       ["notes/cache.md"],
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("VaultManager reconciles before search when cache is empty", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "a2rg-lazy-cache-"));
+  const configDir = path.join(directory, "custom-obsidian");
+
+  try {
+    await mkdir(path.join(directory, "notes"), { recursive: true });
+    await writeFile(
+      path.join(directory, "notes", "cached.md"),
+      "Novedades de plataforma",
+      "utf8",
+    );
+
+    const first = new VaultManager(directory, configDir);
+    assert.deepEqual(
+      (await first.searchFiles("novedades")).map((match) => match.path),
+      ["notes/cached.md"],
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const reloaded = new VaultManager(directory, configDir);
+    assert.deepEqual(
+      (await reloaded.searchFiles("novedades")).map((match) => match.path),
+      ["notes/cached.md"],
     );
   } finally {
     await rm(directory, { recursive: true, force: true });
@@ -215,10 +284,12 @@ test("VaultManager stores the search snapshot in a custom config directory", asy
       "plugins",
       "mcp-vault-connector",
       "cache",
-      "search-index-v1.json",
+      "search-index-v3.json.gz",
     );
-    const snapshot = JSON.parse(await readFile(cachePath, "utf-8"));
-    assert.equal(snapshot.version, 1);
+    const snapshot = JSON.parse(
+      gunzipSync(await readFile(cachePath)).toString("utf-8"),
+    );
+    assert.equal(snapshot.version, 3);
     assert.ok(Array.isArray(snapshot.documents));
   } finally {
     await rm(directory, { recursive: true, force: true });

@@ -1,9 +1,52 @@
+import {
+  createPrivateKey,
+  createSign,
+  createVerify,
+  X509Certificate,
+} from "node:crypto";
 import { generate } from "selfsigned";
 
 export interface LocalTlsMaterial {
   fingerprint: string;
   certificate: string;
   privateKey: string;
+}
+
+export function restoreLocalTlsMaterial(
+  certificate: string,
+  privateKey: string,
+  fingerprint: string,
+): LocalTlsMaterial | null {
+  if (
+    !certificate.includes("BEGIN CERTIFICATE")
+    || !privateKey.includes("PRIVATE KEY")
+  ) {
+    return null;
+  }
+
+  try {
+    const certPublicKey = new X509Certificate(certificate).publicKey;
+    const privateKeyObject = createPrivateKey(privateKey);
+    const message = Buffer.from("A2RG local TLS pair verification");
+    const signature = createSign("sha256")
+      .update(message)
+      .sign(privateKeyObject);
+    const validPair = createVerify("sha256")
+      .update(message)
+      .verify(certPublicKey, signature);
+
+    if (!validPair) {
+      return null;
+    }
+
+    return {
+      certificate,
+      privateKey,
+      fingerprint,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function generateLocalTlsCertificate(): Promise<LocalTlsMaterial> {
