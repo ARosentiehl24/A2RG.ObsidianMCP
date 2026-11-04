@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.0.10 - 2026-11-03
+
+- Fixed popout-window compatibility by using `window.setTimeout()` for deferred
+  search reconciliation.
+- Removed unused `serializePostings` code.
+- Documented vault enumeration and its authentication, traversal, and
+  hidden-directory safeguards.
+- Preserved HTTP/HTTPS, stdio fallback, persistent TLS, BM25 search, and
+  incremental indexing behavior.
+
 ## Unreleased
 
 - Used `window.setTimeout()` for deferred plugin search reconciliation to
