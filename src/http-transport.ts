@@ -28,6 +28,7 @@ export class HttpTransport {
     private readonly apiKey: string,
     private readonly timeoutMs: number,
     caCertSource: string = "",
+    private readonly allowInsecureHttp: boolean = false,
   ) {
     const normalizedSource = caCertSource.trim();
     if (normalizedSource.startsWith("-----BEGIN")) {
@@ -48,6 +49,15 @@ export class HttpTransport {
     maxResponseBytes: number,
   ): Promise<HttpResult<T>> {
     const url = new URL(`${this.baseUrl}${endpoint}`);
+    if (url.protocol === "http:" && !this.allowInsecureHttp) {
+      return {
+        ok: false,
+        status: 0,
+        error:
+          "Refusing HTTP transport; enable HTTPS or set OBSIDIAN_ALLOW_INSECURE_HTTP=true for trusted local testing",
+      };
+    }
+
     const headers: Record<string, string> = { ...options.headers };
 
     if (this.apiKey) {

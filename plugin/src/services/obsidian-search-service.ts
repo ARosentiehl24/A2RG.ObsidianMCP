@@ -5,6 +5,7 @@ import {
   TFile,
 } from "obsidian";
 import {
+  deriveSearchFieldContent,
   extractMatchingLines,
   matchesSearchQuery,
   normalizeSearchText,
@@ -248,6 +249,18 @@ export class ObsidianSearchService {
     const content = data ?? await this.app.vault.cachedRead(file);
     const metadata = cache ?? this.app.metadataCache.getFileCache(file);
     const searchableContent = this.buildSearchableContent(content, metadata);
+    const derivedFields = deriveSearchFieldContent(content, file.name);
+    const headingFields = [
+      derivedFields.headings,
+      ...(metadata?.headings ?? []).map((heading) => heading.heading),
+    ].filter(Boolean).join(" ");
+    const tagFields = [
+      derivedFields.tags,
+      ...(metadata?.tags ?? []).map((tag) => tag.tag),
+    ].filter(Boolean).join(" ");
+    const frontmatterFields = metadata?.frontmatter
+      ? JSON.stringify(metadata.frontmatter)
+      : derivedFields.frontmatter;
 
     this.searchIndex.setDocument(
       file.path,
@@ -255,6 +268,12 @@ export class ObsidianSearchService {
       searchableContent,
       file.stat.mtime,
       file.stat.size,
+      {
+        title: derivedFields.title,
+        headings: headingFields,
+        tags: tagFields,
+        frontmatter: frontmatterFields,
+      },
     );
   }
 

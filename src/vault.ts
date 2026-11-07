@@ -9,6 +9,7 @@ import {
 import type { McpVaultPort } from "./ports.js";
 import { PersistentSearchCache } from "./persistent-search-cache.js";
 import {
+  deriveSearchFieldContent,
   extractMatchingLines,
   matchesSearchQuery,
   normalizeSearchText,
@@ -63,8 +64,9 @@ export class VaultManager implements McpVaultPort {
             "plugins",
             "mcp-vault-connector",
             "cache",
-            "search-index-v3.json.gz",
+            "search-index-v4.json.gz",
           ),
+          configDirPath,
         )
       : null;
   }
@@ -217,6 +219,7 @@ export class VaultManager implements McpVaultPort {
             content,
             stats.mtimeMs,
             stats.size,
+            deriveSearchFieldContent(content, path.basename(relativePath)),
           );
         }
 
@@ -344,6 +347,7 @@ export class VaultManager implements McpVaultPort {
           content,
           stats.mtimeMs,
           stats.size,
+          deriveSearchFieldContent(content, entry.name),
         );
       } catch {
         // Ignore unreadable files.
@@ -368,6 +372,7 @@ export class VaultManager implements McpVaultPort {
       content,
       stats?.mtimeMs,
       stats?.size,
+      deriveSearchFieldContent(content, path.basename(normalizedPath)),
     );
   }
 

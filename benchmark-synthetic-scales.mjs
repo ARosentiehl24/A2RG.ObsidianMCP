@@ -32,7 +32,7 @@ for (let number = 0; number < scale; number += 1) {
   const path = `notes/${topic}/${topic}-${String(number).padStart(6, "0")}.md`;
   const name = `${topic}-${String(number).padStart(6, "0")}.md`;
   const content = relevant
-    ? `# ${topic} relevant note\n\nThis document contains ${topic} and is marked relevant for benchmark ${topic}.\n`
+    ? `# ${topic}\n\nThis document contains ${topic} and is marked relevant for benchmark ${topic}.\n`
     : `# ${topic} distractor\n\nThis document contains ${topic} context and benchmark distractor text.\n`;
 
   index.setDocument(path, name, content, number + 1, content.length);

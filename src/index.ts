@@ -17,6 +17,7 @@ const api = new ApiClient(
   config.apiKey,
   config.requestTimeoutMs,
   config.tlsCaCertPath,
+  config.allowInsecureHttp,
 );
 const vault = new VaultManager(config.vaultPath, config.configDirPath);
 const router = new HybridRouter(api, vault, config.preferRestApi);
@@ -25,7 +26,7 @@ const toolRegistry = new McpToolRegistry(router);
 const server = new McpServer(
   {
     name: "@a2rg/obsidian-mcp",
-    version: "1.0.10",
+    version: "1.0.11",
   },
   {
     capabilities: {

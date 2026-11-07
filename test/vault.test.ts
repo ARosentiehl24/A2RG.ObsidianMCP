@@ -3,6 +3,7 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  readdir,
   rm,
   symlink,
   writeFile,
@@ -11,6 +12,7 @@ import { gunzipSync } from "node:zlib";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { PersistentSearchCache } from "../src/persistent-search-cache";
 import { extractMatchingLines, TextSearchIndex } from "../src/search-index";
 import { VaultManager } from "../src/vault";
 
@@ -126,6 +128,65 @@ test("TextSearchIndex ranks BM25 matches and ignores accents", () => {
   assert.equal(accentInsensitive[0], "notes/general.md");
 });
 
+test("TextSearchIndex boosts title, heading, tag, and frontmatter fields", () => {
+  const index = new TextSearchIndex();
+
+  index.setDocument(
+    "notes/title.md",
+    "title.md",
+    "Generic body text.",
+    undefined,
+    undefined,
+    {
+      title: "Quantum Guide",
+      headings: "",
+      tags: "",
+      frontmatter: "",
+    },
+  );
+  index.setDocument(
+    "notes/heading.md",
+    "heading.md",
+    "Generic body text.",
+    undefined,
+    undefined,
+    {
+      title: "Other guide",
+      headings: "Quantum architecture",
+      tags: "",
+      frontmatter: "",
+    },
+  );
+  index.setDocument(
+    "notes/tag.md",
+    "tag.md",
+    "Generic body text.",
+    undefined,
+    undefined,
+    {
+      title: "Tag guide",
+      headings: "",
+      tags: "quantum",
+      frontmatter: "",
+    },
+  );
+  index.setDocument(
+    "notes/body.md",
+    "body.md",
+    "quantum quantum quantum",
+    undefined,
+    undefined,
+    {
+      title: "Body guide",
+      headings: "",
+      tags: "",
+      frontmatter: "",
+    },
+  );
+
+  assert.equal(index.findCandidates("quantum", 20)[0], "notes/title.md");
+});
+
 test("TextSearchIndex persists postings, metadata and complete results", () => {
   const index = new TextSearchIndex();
   index.setDocument(
@@ -134,6 +195,12 @@ test("TextSearchIndex persists postings, metadata and complete results", () => {
     "durable search cache",
     1234,
     42,
+    {
+      title: "Durable Search",
+      headings: "Persistent Index",
+      tags: "cache",
+      frontmatter: "project: search",
+    },
   );
   index.setCachedResults("durable search:20", [
     { path: "notes/persistent.md", matches: ["durable search cache"] },
@@ -156,7 +223,7 @@ test("TextSearchIndex persists postings, metadata and complete results", () => {
 test("TextSearchIndex rejects unsafe restored documents and postings", () => {
   const index = new TextSearchIndex();
   index.restoreSnapshot({
-    version: 3,
+    version: 4,
     documents: [
       {
         path: "../secret.md",
@@ -217,13 +284,13 @@ test("VaultManager persists and reloads the search snapshot", async () => {
       "plugins",
       "mcp-vault-connector",
       "cache",
-      "search-index-v3.json.gz",
+      "search-index-v4.json.gz",
     );
     await new Promise((resolve) => setTimeout(resolve, 300));
     const snapshot = JSON.parse(
       gunzipSync(await readFile(cachePath)).toString("utf-8"),
     );
-    assert.equal(snapshot.version, 3);
+    assert.equal(snapshot.version, 4);
     assert.ok(Array.isArray(snapshot.documents));
 
     const reloaded = new VaultManager(directory, configDir);
@@ -284,14 +351,65 @@ test("VaultManager stores the search snapshot in a custom config directory", asy
       "plugins",
       "mcp-vault-connector",
       "cache",
-      "search-index-v3.json.gz",
+      "search-index-v4.json.gz",
     );
     const snapshot = JSON.parse(
       gunzipSync(await readFile(cachePath)).toString("utf-8"),
     );
-    assert.equal(snapshot.version, 3);
+    assert.equal(snapshot.version, 4);
     assert.ok(Array.isArray(snapshot.documents));
   } finally {
     await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("PersistentSearchCache does not follow a predictable temporary symlink", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "a2rg-cache-symlink-"));
+  const configDir = path.join(root, "config");
+  const cacheDir = path.join(
+    configDir,
+    "plugins",
+    "mcp-vault-connector",
+    "cache",
+  );
+  const cachePath = path.join(cacheDir, "search-index-v4.json.gz");
+  const outsidePath = path.join(root, "outside.txt");
+
+  try {
+    await mkdir(cacheDir, { recursive: true });
+    await writeFile(outsidePath, "untouched", "utf8");
+    await symlink(outsidePath, `${cachePath}.tmp`);
+
+    const cache = new PersistentSearchCache(cachePath, configDir);
+    assert.equal(await cache.save(new TextSearchIndex()), true);
+    assert.equal(await readFile(outsidePath, "utf8"), "untouched");
+    assert.ok((await readFile(cachePath)).length > 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("PersistentSearchCache rejects symlinked cache directories", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "a2rg-cache-dir-symlink-"));
+  const configDir = path.join(root, "config");
+  const outsideDir = path.join(root, "outside");
+  const cachePath = path.join(
+    configDir,
+    "plugins",
+    "mcp-vault-connector",
+    "cache",
+    "search-index-v4.json.gz",
+  );
+
+  try {
+    await mkdir(configDir);
+    await mkdir(outsideDir);
+    await symlink(outsideDir, path.join(configDir, "plugins"));
+
+    const cache = new PersistentSearchCache(cachePath, configDir);
+    assert.equal(await cache.save(new TextSearchIndex()), false);
+    assert.deepEqual(await readdir(outsideDir), []);
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });

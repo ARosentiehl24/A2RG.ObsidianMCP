@@ -14,7 +14,7 @@ interface CliOptions {
   version: boolean;
 }
 
-const PACKAGE_VERSION = "1.0.10";
+const PACKAGE_VERSION = "1.0.11";
 
 function usage(): string {
   return `obsidian-mcp ${PACKAGE_VERSION}
@@ -137,6 +137,7 @@ async function main(): Promise<void> {
       bearerTokenConfigured: config.apiKey !== "",
       caCertificateConfigured: config.tlsCaCertSource !== "none",
       preferRestApi: config.preferRestApi,
+      allowInsecureHttp: config.allowInsecureHttp,
       requestTimeoutMs: config.requestTimeoutMs,
     }, null, 2)}\n`);
     return;

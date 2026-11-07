@@ -65,8 +65,10 @@ issue reports, screenshots, or public documentation.
 
 ## Transport security
 
-HTTP is supported only for trusted loopback testing. HTTPS is recommended and
-uses a generated self-signed certificate that clients must explicitly trust.
+HTTP is disabled by default because a second local process can occupy the port
+and impersonate Obsidian. It requires an explicit insecure-HTTP opt-in for
+trusted testing. HTTPS is enabled by default and uses a generated self-signed
+certificate that clients must explicitly trust.
 
 The local TLS certificate and matching private key are persisted in plugin
 `data.json`. The plugin restores this pair after Obsidian reloads or restarts,
@@ -95,8 +97,8 @@ There is no public browser login or OAuth flow.
 
 The plugin serves MCP at `/mcp` over loopback HTTP or HTTPS.
 
-- HTTP: simplest local setup, but bearer traffic stays unencrypted on the
-  loopback interface.
+- HTTP: testing only, blocked unless **Allow insecure HTTP** is enabled in the
+  plugin or `OBSIDIAN_ALLOW_INSECURE_HTTP=true` is set for stdio access.
 - HTTPS: recommended local setup, but the MCP client must trust the generated
   local certificate.
 

@@ -13,12 +13,14 @@ export interface Config {
   preferRestApi: boolean;
   requestTimeoutMs: number;
   tlsCaCertPath: string;
+  allowInsecureHttp: boolean;
 }
 
 export interface ObsidianPluginSettings {
   enabled?: boolean;
   port?: number;
   tlsEnabled?: boolean;
+  allowInsecureHttp?: boolean;
   token?: string;
   tlsCertificate?: string;
   tlsFingerprint?: string;
@@ -128,6 +130,10 @@ export function readObsidianPluginSettings(
           : undefined,
       tlsEnabled:
         typeof data.tlsEnabled === "boolean" ? data.tlsEnabled : undefined,
+      allowInsecureHttp:
+        typeof data.allowInsecureHttp === "boolean"
+          ? data.allowInsecureHttp
+          : undefined,
       token:
         typeof data.token === "string" && /^[0-9a-f]{64}$/i.test(data.token)
           ? data.token
@@ -270,6 +276,11 @@ export function loadConfig(): Config {
     Number.isFinite(parsedTimeout)
       ? Math.min(Math.max(parsedTimeout, 100), 300_000)
       : 3000;
+  const configuredInsecureHttp =
+    process.env.OBSIDIAN_ALLOW_INSECURE_HTTP?.trim();
+  const allowInsecureHttp = configuredInsecureHttp
+    ? configuredInsecureHttp === "true"
+    : pluginSettings?.allowInsecureHttp === true;
 
   let tlsCaCertPath = process.env.OBSIDIAN_CA_CERT?.trim() || "";
   let tlsCaCertSource: Config["tlsCaCertSource"] =
@@ -290,5 +301,6 @@ export function loadConfig(): Config {
     preferRestApi,
     requestTimeoutMs,
     tlsCaCertPath,
+    allowInsecureHttp,
   };
 }

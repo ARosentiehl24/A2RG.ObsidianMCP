@@ -44,6 +44,40 @@ test("ApiClient performs authenticated HTTP search and list requests", async () 
     }
   });
 
+  test("ApiClient refuses plain HTTP unless explicitly allowed", async () => {
+    let requestCount = 0;
+    const server = http.createServer((_request, response) => {
+      requestCount += 1;
+      response.end(JSON.stringify({ status: "ok" }));
+    });
+
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", resolve);
+    });
+
+    try {
+      const address = server.address();
+      if (!address || typeof address === "string") {
+        throw new Error("Test server address unavailable");
+      }
+      const api = new ApiClient(
+        `http://127.0.0.1:${address.port}`,
+        "secret-token",
+        100,
+      );
+      const response = await api.putFile("notes/private.md", "private content");
+
+      assert.equal(response.ok, false);
+      assert.equal(response.status, 0);
+      assert.match(response.error ?? "", /Refusing HTTP transport/);
+      assert.equal(requestCount, 0);
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => error ? reject(error) : resolve());
+      });
+    }
+  });
+
   test("ApiClient marks timed-out append operations as ambiguous", async () => {
     const server = http.createServer((_request, response) => {
       setTimeout(() => {
@@ -66,6 +100,8 @@ test("ApiClient performs authenticated HTTP search and list requests", async () 
         `http://127.0.0.1:${address.port}`,
         "test-key",
         50,
+        "",
+        true,
       );
       const response = await api.appendFile("notes/example.md", " World");
       assert.equal(response.ok, false);
@@ -91,6 +127,8 @@ test("ApiClient performs authenticated HTTP search and list requests", async () 
       `http://127.0.0.1:${address.port}`,
       "test-key",
       1000,
+      "",
+      true,
     );
     assert.equal(await api.isAvailable(), true);
 

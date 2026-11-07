@@ -105,6 +105,7 @@ Available environment variables:
 | `OBSIDIAN_API_KEY` | Plugin bearer token. |
 | `OBSIDIAN_CA_CERT` | PEM content or local PEM file path. |
 | `OBSIDIAN_PREFER_REST` | Use plugin REST before filesystem fallback. |
+| `OBSIDIAN_ALLOW_INSECURE_HTTP` | Explicitly allow token and vault data over loopback HTTP for testing. |
 | `OBSIDIAN_TIMEOUT_MS` | REST timeout from 100 to 300000 ms. |
 
 Environment values override plugin `data.json`. CLI flags override environment
@@ -224,10 +225,11 @@ The package:
 - Persists stdio search snapshots under the discovered vault's
   `OBSIDIAN_CONFIG_DIR/plugins/mcp-vault-connector/cache/`.
 - Uses BM25 term-frequency ranking with name and content fields.
+- Uses title, heading, tag, and frontmatter BM25 field weights.
 - Uses compact BM25 term postings and token trigrams for candidate discovery.
 - Keeps an in-memory search index and caches search results for 60 seconds.
 - Persists and restores up to 128 recent query results between stdio restarts.
-- Stores the BM25 snapshot as a gzip-compressed `search-index-v3.json.gz`.
+- Stores the field-aware BM25 snapshot as a gzip-compressed `search-index-v4.json.gz`.
 - Loads the persistent snapshot before reconciliation and searches cached candidates immediately.
 - Reconciles changed, deleted, and new files in the background.
 - Keeps append idempotency results for five minutes.

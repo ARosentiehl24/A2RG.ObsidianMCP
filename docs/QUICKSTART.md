@@ -3,7 +3,7 @@
 This guide configures Streamable HTTP MCP first. The stdio executable is only
 an optional fallback.
 
-Current release: `1.0.10`.
+Current release: `1.0.11`.
 
 ## 1. Requirements
 
@@ -37,7 +37,8 @@ Open **Settings → Community Plugins → A2RG MCP Bridge**.
 |---|---|
 | Enable bridge | Enabled |
 | Port | `27125` |
-| Use local HTTPS | Enabled if the client trusts a local CA |
+| Use local HTTPS | Enabled |
+| Allow insecure HTTP | Disabled |
 | Bearer token | Copy or generate |
 
 HTTP endpoint:
@@ -56,7 +57,7 @@ The bridge listens only on `127.0.0.1`.
 
 ## 4. Configure the MCP client
 
-For HTTP:
+For HTTP testing only, first enable **Allow insecure HTTP**:
 
 ```json
 {
@@ -72,7 +73,7 @@ For HTTP:
 }
 ```
 
-For HTTPS, use `https://127.0.0.1:27125/mcp` and configure the client to trust
+For normal use, enable HTTPS, use `https://127.0.0.1:27125/mcp`, and configure the client to trust
 the certificate PEM displayed or exported by the plugin.
 
 Example:

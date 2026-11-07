@@ -80,9 +80,18 @@ Searches note names and Markdown or text content.
 {"query":"meeting","limit":50}
 ```
 
-The plugin maintains an in-memory BM25 index for names, Markdown content,
-headings, tags, and frontmatter. It uses term frequencies and document
-frequencies to rank files rather than returning only insertion-order matches.
+The plugin maintains an in-memory field-aware BM25 index for names, titles,
+Markdown content, headings, tags, and frontmatter. It uses term frequencies
+and document frequencies to rank files rather than returning only
+insertion-order matches.
+
+Field weights:
+
+- Title/H1: `3.5`
+- Headings: `2.5`
+- Tags: `2`
+- Frontmatter: `1.5`
+- Filename and content retain separate BM25 scoring.
 
 It keeps compact token trigrams for candidate discovery and accent-insensitive
 matching. Search text is normalized with Unicode-compatible lowercase and
@@ -95,7 +104,7 @@ without resolved Obsidian link metadata.
 The plugin persists an index snapshot under:
 
 ```text
-<Obsidian config directory>/plugins/mcp-vault-connector/cache/search-index-v3.json.gz
+<Obsidian config directory>/plugins/mcp-vault-connector/cache/search-index-v4.json.gz
 ```
 
 The snapshot stores document metadata and posting maps, not complete note

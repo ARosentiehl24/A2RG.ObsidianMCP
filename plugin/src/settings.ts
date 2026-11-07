@@ -11,6 +11,7 @@ export interface BridgeSettings {
   port: number;
   token: string;
   tlsEnabled: boolean;
+  allowInsecureHttp: boolean;
   tlsFingerprint: string;
   tlsCertificate: string;
   tlsPrivateKey: string;
@@ -21,7 +22,8 @@ export const DEFAULT_SETTINGS: BridgeSettings = {
   enabled: true,
   port: 27125,
   token: "",
-  tlsEnabled: false,
+  tlsEnabled: true,
+  allowInsecureHttp: false,
   tlsFingerprint: "",
   tlsCertificate: "",
   tlsPrivateKey: "",
@@ -37,6 +39,7 @@ export function sanitizeBridgeSettings(value: unknown): BridgeSettings {
   const enabled = readProperty(value, "enabled");
   const port = readProperty(value, "port");
   const tlsEnabled = readProperty(value, "tlsEnabled");
+  const allowInsecureHttp = readProperty(value, "allowInsecureHttp");
   const tlsFingerprint = readProperty(value, "tlsFingerprint");
   const tlsCertificate = readProperty(value, "tlsCertificate");
   const tlsPrivateKey = readProperty(value, "tlsPrivateKey");
@@ -58,6 +61,10 @@ export function sanitizeBridgeSettings(value: unknown): BridgeSettings {
         : "",
     tlsEnabled:
       typeof tlsEnabled === "boolean" ? tlsEnabled : defaults.tlsEnabled,
+    allowInsecureHttp:
+      typeof allowInsecureHttp === "boolean"
+        ? allowInsecureHttp
+        : defaults.allowInsecureHttp,
     tlsFingerprint:
       typeof tlsFingerprint === "string"
         ? tlsFingerprint
@@ -134,10 +141,19 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
           },
           {
             name: "Use local HTTPS",
-            desc: "Generate a certificate and serve HTTPS on loopback.",
+            desc: "Recommended. Generate a certificate and serve HTTPS on loopback.",
             control: {
               type: "toggle",
               key: "tlsEnabled",
+              defaultValue: true,
+            },
+          },
+          {
+            name: "Allow insecure HTTP",
+            desc: "Testing only. HTTP can expose bearer tokens and vault data to another local process.",
+            control: {
+              type: "toggle",
+              key: "allowInsecureHttp",
               defaultValue: false,
             },
           },
@@ -243,6 +259,8 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
         return this.plugin.settings.enabled;
       case "tlsEnabled":
         return this.plugin.settings.tlsEnabled;
+      case "allowInsecureHttp":
+        return this.plugin.settings.allowInsecureHttp;
       case "port":
         return this.plugin.settings.port;
       case "token":
@@ -273,6 +291,12 @@ export class A2rgBridgeSettingTab extends PluginSettingTab {
               error instanceof Error ? error.message : String(error);
             new Notice(`Could not generate the local certificate: ${message}`);
           }
+        }
+        break;
+      case "allowInsecureHttp":
+        if (typeof value === "boolean") {
+          this.plugin.settings.allowInsecureHttp = value;
+          await this.plugin.saveSettings();
         }
         break;
       case "port":

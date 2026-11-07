@@ -3,15 +3,24 @@ export interface IndexedSearchDocument {
   name: string;
   mtimeMs?: number;
   sizeBytes?: number;
+  fields?: Required<SearchFieldContent>;
+}
+
+export interface SearchFieldContent {
+  title?: string;
+  headings?: string;
+  tags?: string;
+  frontmatter?: string;
 }
 
 export interface TextSearchSnapshot {
-  version: 3;
+  version: 4;
   documents: Array<{
     path: string;
     name: string;
     mtimeMs?: number;
     sizeBytes?: number;
+    fields?: Required<SearchFieldContent>;
   }>;
   trigrams: Array<[string, string[]]>;
   bigrams: Array<[string, string[]]>;
@@ -21,6 +30,14 @@ export interface TextSearchSnapshot {
   documentLengths: Array<[string, number]>;
   nameTermPostings: Array<[string, Array<[string, number]>]>;
   nameDocumentLengths: Array<[string, number]>;
+  titleTermPostings: Array<[string, Array<[string, number]>]>;
+  titleDocumentLengths: Array<[string, number]>;
+  headingTermPostings: Array<[string, Array<[string, number]>]>;
+  headingDocumentLengths: Array<[string, number]>;
+  tagTermPostings: Array<[string, Array<[string, number]>]>;
+  tagDocumentLengths: Array<[string, number]>;
+  frontmatterTermPostings: Array<[string, Array<[string, number]>]>;
+  frontmatterDocumentLengths: Array<[string, number]>;
   queryCache: Array<{
     key: string;
     expiresAt: number;
@@ -38,6 +55,14 @@ export class TextSearchIndex {
   private readonly documentLengths = new Map<string, number>();
   private readonly nameTermPostings = new Map<string, Map<string, number>>();
   private readonly nameDocumentLengths = new Map<string, number>();
+  private readonly titleTermPostings = new Map<string, Map<string, number>>();
+  private readonly titleDocumentLengths = new Map<string, number>();
+  private readonly headingTermPostings = new Map<string, Map<string, number>>();
+  private readonly headingDocumentLengths = new Map<string, number>();
+  private readonly tagTermPostings = new Map<string, Map<string, number>>();
+  private readonly tagDocumentLengths = new Map<string, number>();
+  private readonly frontmatterTermPostings = new Map<string, Map<string, number>>();
+  private readonly frontmatterDocumentLengths = new Map<string, number>();
   private readonly resultCache = new Map<
     string,
     { expiresAt: number; results: unknown[] }
@@ -53,6 +78,14 @@ export class TextSearchIndex {
     this.documentLengths.clear();
     this.nameTermPostings.clear();
     this.nameDocumentLengths.clear();
+    this.titleTermPostings.clear();
+    this.titleDocumentLengths.clear();
+    this.headingTermPostings.clear();
+    this.headingDocumentLengths.clear();
+    this.tagTermPostings.clear();
+    this.tagDocumentLengths.clear();
+    this.frontmatterTermPostings.clear();
+    this.frontmatterDocumentLengths.clear();
     this.resultCache.clear();
   }
 
@@ -62,14 +95,28 @@ export class TextSearchIndex {
     content: string,
     mtimeMs?: number,
     sizeBytes?: number,
+    fields?: SearchFieldContent,
   ): void {
     if (this.documents.has(path)) {
       this.removeDocument(path);
     }
 
-    this.documents.set(path, { path, name, mtimeMs, sizeBytes });
     const normalizedContent = normalizeSearchText(content);
     const normalizedName = normalizeSearchText(name);
+    const derivedFields = deriveSearchFieldContent(content, name);
+    const fieldContent: Required<SearchFieldContent> = {
+      title: normalizeSearchText(fields?.title ?? derivedFields.title ?? ""),
+      headings: normalizeSearchText(fields?.headings ?? derivedFields.headings ?? ""),
+      tags: normalizeSearchText(fields?.tags ?? derivedFields.tags ?? ""),
+      frontmatter: normalizeSearchText(fields?.frontmatter ?? derivedFields.frontmatter ?? ""),
+    };
+    this.documents.set(path, {
+      path,
+      name,
+      mtimeMs,
+      sizeBytes,
+      fields: fieldContent,
+    });
 
     const terms = tokenize(normalizedContent);
     this.addTokenPostings(this.trigrams, terms, path);
@@ -96,6 +143,31 @@ export class TextSearchIndex {
       }
       posting.set(path, frequency);
     }
+
+    this.addFieldPostings(
+      this.titleTermPostings,
+      this.titleDocumentLengths,
+      fieldContent.title,
+      path,
+    );
+    this.addFieldPostings(
+      this.headingTermPostings,
+      this.headingDocumentLengths,
+      fieldContent.headings,
+      path,
+    );
+    this.addFieldPostings(
+      this.tagTermPostings,
+      this.tagDocumentLengths,
+      fieldContent.tags,
+      path,
+    );
+    this.addFieldPostings(
+      this.frontmatterTermPostings,
+      this.frontmatterDocumentLengths,
+      fieldContent.frontmatter,
+      path,
+    );
   }
 
   removeDocument(path: string): void {
@@ -105,8 +177,16 @@ export class TextSearchIndex {
     this.removeFromPostings(this.nameBigrams, path);
     this.removeTermPostings(this.termPostings, path);
     this.removeTermPostings(this.nameTermPostings, path);
+    this.removeTermPostings(this.titleTermPostings, path);
+    this.removeTermPostings(this.headingTermPostings, path);
+    this.removeTermPostings(this.tagTermPostings, path);
+    this.removeTermPostings(this.frontmatterTermPostings, path);
     this.documentLengths.delete(path);
     this.nameDocumentLengths.delete(path);
+    this.titleDocumentLengths.delete(path);
+    this.headingDocumentLengths.delete(path);
+    this.tagDocumentLengths.delete(path);
+    this.frontmatterDocumentLengths.delete(path);
     this.documents.delete(path);
     this.clearResultCache();
   }
@@ -125,7 +205,7 @@ export class TextSearchIndex {
 
   toSnapshot(): TextSearchSnapshot {
     return {
-      version: 3,
+      version: 4,
       documents: Array.from(this.documents.values()).map((document) => ({ ...document })),
       trigrams: [],
       bigrams: [],
@@ -135,6 +215,14 @@ export class TextSearchIndex {
       documentLengths: Array.from(this.documentLengths),
       nameTermPostings: serializeTermPostings(this.nameTermPostings),
       nameDocumentLengths: Array.from(this.nameDocumentLengths),
+      titleTermPostings: serializeTermPostings(this.titleTermPostings),
+      titleDocumentLengths: Array.from(this.titleDocumentLengths),
+      headingTermPostings: serializeTermPostings(this.headingTermPostings),
+      headingDocumentLengths: Array.from(this.headingDocumentLengths),
+      tagTermPostings: serializeTermPostings(this.tagTermPostings),
+      tagDocumentLengths: Array.from(this.tagDocumentLengths),
+      frontmatterTermPostings: serializeTermPostings(this.frontmatterTermPostings),
+      frontmatterDocumentLengths: Array.from(this.frontmatterDocumentLengths),
       queryCache: Array.from(this.resultCache)
         .filter(([, entry]) => entry.expiresAt > Date.now())
         .slice(0, 128)
@@ -147,7 +235,7 @@ export class TextSearchIndex {
   }
 
   restoreSnapshot(snapshot: TextSearchSnapshot): void {
-    if (!snapshot || snapshot.version !== 3) {
+    if (!snapshot || snapshot.version !== 4) {
       return;
     }
 
@@ -176,7 +264,24 @@ export class TextSearchIndex {
       ) {
         continue;
       }
-      this.documents.set(document.path, { ...document });
+      const fields = document.fields
+        && typeof document.fields === "object"
+        ? {
+            title: typeof document.fields.title === "string"
+              ? document.fields.title
+              : "",
+            headings: typeof document.fields.headings === "string"
+              ? document.fields.headings
+              : "",
+            tags: typeof document.fields.tags === "string"
+              ? document.fields.tags
+              : "",
+            frontmatter: typeof document.fields.frontmatter === "string"
+              ? document.fields.frontmatter
+              : "",
+          }
+        : undefined;
+      this.documents.set(document.path, { ...document, fields });
       allowedPaths.add(document.path);
     }
 
@@ -202,6 +307,46 @@ export class TextSearchIndex {
     restoreDocumentLengths(
       this.nameDocumentLengths,
       snapshot.nameDocumentLengths,
+      allowedPaths,
+    );
+    restoreTermPostings(
+      this.titleTermPostings,
+      snapshot.titleTermPostings,
+      allowedPaths,
+    );
+    restoreDocumentLengths(
+      this.titleDocumentLengths,
+      snapshot.titleDocumentLengths,
+      allowedPaths,
+    );
+    restoreTermPostings(
+      this.headingTermPostings,
+      snapshot.headingTermPostings,
+      allowedPaths,
+    );
+    restoreDocumentLengths(
+      this.headingDocumentLengths,
+      snapshot.headingDocumentLengths,
+      allowedPaths,
+    );
+    restoreTermPostings(
+      this.tagTermPostings,
+      snapshot.tagTermPostings,
+      allowedPaths,
+    );
+    restoreDocumentLengths(
+      this.tagDocumentLengths,
+      snapshot.tagDocumentLengths,
+      allowedPaths,
+    );
+    restoreTermPostings(
+      this.frontmatterTermPostings,
+      snapshot.frontmatterTermPostings,
+      allowedPaths,
+    );
+    restoreDocumentLengths(
+      this.frontmatterDocumentLengths,
+      snapshot.frontmatterDocumentLengths,
       allowedPaths,
     );
     for (const entry of snapshot.queryCache ?? []) {
@@ -290,6 +435,18 @@ export class TextSearchIndex {
       for (const path of this.nameTermPostings.get(term)?.keys() ?? []) {
         candidates.add(path);
       }
+      for (const path of this.titleTermPostings.get(term)?.keys() ?? []) {
+        candidates.add(path);
+      }
+      for (const path of this.headingTermPostings.get(term)?.keys() ?? []) {
+        candidates.add(path);
+      }
+      for (const path of this.tagTermPostings.get(term)?.keys() ?? []) {
+        candidates.add(path);
+      }
+      for (const path of this.frontmatterTermPostings.get(term)?.keys() ?? []) {
+        candidates.add(path);
+      }
     }
 
     if (candidates.size === 0) {
@@ -344,6 +501,56 @@ export class TextSearchIndex {
       ? averageNameLength / this.documents.size
       : 0;
 
+    const averageFieldLength = (
+      lengths: Map<string, number>,
+    ): number => {
+      let total = 0;
+      let count = 0;
+      for (const length of lengths.values()) {
+        total += length;
+        count += 1;
+      }
+      return count > 0 ? total / count : 0;
+    };
+
+    const averageTitleLength = averageFieldLength(this.titleDocumentLengths);
+    const averageHeadingLength = averageFieldLength(this.headingDocumentLengths);
+    const averageTagLength = averageFieldLength(this.tagDocumentLengths);
+    const averageFrontmatterLength =
+      averageFieldLength(this.frontmatterDocumentLengths);
+
+    const scoreFieldTerms = (
+      postingMap: Map<string, Map<string, number>>,
+      lengthMap: Map<string, number>,
+      weight: number,
+      candidatePath: string,
+      averageLength: number,
+    ): number => {
+      let fieldScore = 0;
+      for (const term of terms) {
+        const posting = postingMap.get(term);
+        const termFrequency = posting?.get(candidatePath) ?? 0;
+        if (termFrequency <= 0) {
+          continue;
+        }
+        const documentFrequency = posting?.size ?? 0;
+        const inverseDocumentFrequency = Math.log(
+          1 + (
+            (documentCount - documentFrequency + 0.5)
+            / (documentFrequency + 0.5)
+          ),
+        );
+        const documentLength = lengthMap.get(candidatePath) ?? 0;
+        const normalizedLength =
+          documentLength / Math.max(averageLength, 1);
+        const frequencyScore =
+          (termFrequency * (1.2 + 1))
+          / (termFrequency + 1.2 * (1 - 0.75 + 0.75 * normalizedLength));
+        fieldScore += weight * inverseDocumentFrequency * frequencyScore;
+      }
+      return fieldScore;
+    };
+
     const top: Array<{ path: string; score: number }> = [];
     const maxResults = Math.max(1, limit);
     for (const path of candidates) {
@@ -356,7 +563,46 @@ export class TextSearchIndex {
         } else if (normalizedName.includes(normalizedQuery)) {
           score += 5;
         }
+        const normalizedTitle = normalizeSearchText(
+          document.fields?.title ?? "",
+        );
+        if (normalizedTitle === normalizedQuery) {
+          score += 12;
+        } else if (normalizedTitle.startsWith(`${normalizedQuery} `)) {
+          score += 8;
+        } else if (normalizedTitle.includes(normalizedQuery)) {
+          score += 4;
+        }
       }
+
+      score += scoreFieldTerms(
+        this.titleTermPostings,
+        this.titleDocumentLengths,
+        3.5,
+        path,
+        averageTitleLength,
+      );
+      score += scoreFieldTerms(
+        this.headingTermPostings,
+        this.headingDocumentLengths,
+        2.5,
+        path,
+        averageHeadingLength,
+      );
+      score += scoreFieldTerms(
+        this.tagTermPostings,
+        this.tagDocumentLengths,
+        2,
+        path,
+        averageTagLength,
+      );
+      score += scoreFieldTerms(
+        this.frontmatterTermPostings,
+        this.frontmatterDocumentLengths,
+        1.5,
+        path,
+        averageFrontmatterLength,
+      );
 
       for (const term of terms) {
         const contentPosting = this.termPostings.get(term);
@@ -448,6 +694,25 @@ export class TextSearchIndex {
         index.set(gram, paths);
       }
       paths.add(path);
+    }
+  }
+
+  private addFieldPostings(
+    postings: Map<string, Map<string, number>>,
+    lengths: Map<string, number>,
+    text: string,
+    path: string,
+  ): void {
+    const terms = tokenize(text);
+    lengths.set(path, terms.length);
+    const counts = countTerms(terms);
+    for (const [term, frequency] of counts) {
+      let posting = postings.get(term);
+      if (!posting) {
+        posting = new Map();
+        postings.set(term, posting);
+      }
+      posting.set(path, frequency);
     }
   }
 
@@ -639,6 +904,48 @@ function isSafeIndexedPath(relativePath: string): boolean {
   }
 
   return /\.(md|txt)$/i.test(replaced);
+}
+
+export function deriveSearchFieldContent(
+  content: string,
+  name: string,
+): Required<SearchFieldContent> {
+  const frontmatterMatch = content.match(
+    /^---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/,
+  );
+  const frontmatter = frontmatterMatch?.[1] ?? "";
+  const contentWithoutFrontmatter = frontmatterMatch
+    ? content.slice(frontmatterMatch[0].length)
+    : content;
+
+  const headingMatches = contentWithoutFrontmatter.matchAll(
+    /^#{1,6}\s+(.+)$/gm,
+  );
+  const headings = Array.from(
+    headingMatches,
+    (match) => match[1] ?? "",
+  ).join(" ");
+
+  const inlineTags = Array.from(
+    contentWithoutFrontmatter.matchAll(/(^|\s)#([A-Za-z0-9_\-/]+)/gu),
+    (match) => match[2] ?? "",
+  );
+  const frontmatterTags = Array.from(
+    frontmatter.matchAll(/(?:^|\n)\s*(?:tags?|tag)\s*:\s*(.*)$/gim),
+    (match) => match[1] ?? "",
+  ).join(" ");
+  const tags = normalizeSearchText(`${frontmatterTags} ${inlineTags.join(" ")}`);
+
+  const titleMatch = contentWithoutFrontmatter.match(/^#\s+(.+)$/m);
+  const title = titleMatch?.[1]?.trim()
+    || name.replace(/\.(md|txt)$/i, "");
+
+  return {
+    title,
+    headings,
+    tags,
+    frontmatter,
+  };
 }
 
 export function normalizeSearchText(text: string): string {

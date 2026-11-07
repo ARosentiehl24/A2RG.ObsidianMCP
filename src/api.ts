@@ -27,6 +27,7 @@ export class ApiClient {
     apiKey: string,
     timeoutMs: number = 3000,
     caCertPath: string = "",
+    allowInsecureHttp: boolean = false,
   ) {
     this.baseUrl = baseUrl.replace(/\/+$/, "");
     this.transport = new HttpTransport(
@@ -34,6 +35,7 @@ export class ApiClient {
       apiKey,
       timeoutMs,
       caCertPath,
+      allowInsecureHttp,
     );
   }
 

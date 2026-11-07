@@ -18,6 +18,7 @@ test("loadConfig reads HTTPS and vault environment values", () => {
     "OBSIDIAN_PREFER_REST",
     "OBSIDIAN_TIMEOUT_MS",
     "OBSIDIAN_CA_CERT",
+    "OBSIDIAN_ALLOW_INSECURE_HTTP",
   ] as const;
   const previous = new Map(
     keys.map((key) => [key, process.env[key]]),
@@ -31,6 +32,7 @@ test("loadConfig reads HTTPS and vault environment values", () => {
     process.env.OBSIDIAN_PREFER_REST = "true";
     process.env.OBSIDIAN_TIMEOUT_MS = "4321";
     process.env.OBSIDIAN_CA_CERT = "/tmp/test-ca.pem";
+    process.env.OBSIDIAN_ALLOW_INSECURE_HTTP = "true";
 
     const config = loadConfig();
     assert.equal(config.vaultPath, "/tmp/test-vault");
@@ -40,6 +42,7 @@ test("loadConfig reads HTTPS and vault environment values", () => {
     assert.equal(config.preferRestApi, true);
     assert.equal(config.requestTimeoutMs, 4321);
     assert.equal(config.tlsCaCertPath, "/tmp/test-ca.pem");
+    assert.equal(config.allowInsecureHttp, true);
   } finally {
     for (const [key, value] of previous) {
       if (value === undefined) {

@@ -60,6 +60,8 @@ test("HybridRouter does not fall back after definite HTTP authorization failures
       `http://127.0.0.1:${address.port}`,
       "wrong-token",
       50,
+      "",
+      true,
     );
     const router = new HybridRouter(api, vault, true);
 
@@ -109,6 +111,8 @@ test("HybridRouter skips filesystem append after a REST timeout", async () => {
       `http://127.0.0.1:${address.port}`,
       "",
       50,
+      "",
+      true,
     );
     const router = new HybridRouter(api, vault, true);
 
@@ -149,6 +153,8 @@ test("HybridRouter skips filesystem fallback for ambiguous write and delete", as
       `http://127.0.0.1:${address.port}`,
       "",
       50,
+      "",
+      true,
     );
     const router = new HybridRouter(api, vault, true);
 

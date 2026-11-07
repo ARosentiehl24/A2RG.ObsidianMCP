@@ -145,6 +145,12 @@ export default class A2rgMcpBridgePlugin extends Plugin {
     if (!this.settings.enabled) {
       return;
     }
+    if (!this.settings.tlsEnabled && !this.settings.allowInsecureHttp) {
+      new Notice(
+        "Bridge blocked: enable local HTTPS or explicitly allow insecure HTTP for testing.",
+      );
+      return;
+    }
 
     const vault = new ObsidianVaultAdapter(this.app, this);
     this.vaultAdapter = vault;

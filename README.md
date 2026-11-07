@@ -4,7 +4,7 @@ A2RG MCP Bridge connects MCP clients to an open Obsidian vault through a local
 desktop plugin. It exposes eight vault tools through Streamable HTTP MCP and
 keeps an optional Bun stdio process for filesystem fallback.
 
-Current release: `1.0.10`.
+Current release: `1.0.11`.
 
 ## Components
 
@@ -26,8 +26,8 @@ MCP client
   -> App.vault / App.metadataCache / App.workspace
 ```
 
-HTTP is convenient for loopback testing. HTTPS is recommended when the client
-supports local certificate trust.
+Local HTTPS is the default. Plain HTTP is blocked unless explicitly enabled
+for trusted loopback testing.
 
 ## Quick start
 
@@ -49,7 +49,7 @@ supports local certificate trust.
 4. In plugin settings:
    - Enable the bridge.
    - Keep port `27125` unless a conflict requires another port.
-   - Enable local HTTPS only if the MCP client can trust the generated certificate.
+   - Keep local HTTPS enabled and trust the generated certificate.
    - Copy the 64-character bearer token.
 
 5. Configure the MCP client:
@@ -59,7 +59,7 @@ supports local certificate trust.
      "mcpServers": {
        "obsidian": {
          "type": "http",
-         "url": "http://127.0.0.1:27125/mcp",
+         "url": "https://127.0.0.1:27125/mcp",
          "headers": {
            "Authorization": "Bearer <64-character-plugin-token>"
          }
@@ -73,7 +73,7 @@ before connecting. The certificate and private key persist across Obsidian
 reloads and restarts. Use **Regenerate local TLS certificate** in plugin
 settings only when you intentionally replace that identity.
 
-HTTP MCP does not require `OBSIDIAN_VAULT_PATH`, `OBSIDIAN_CONFIG_DIR`,
+Direct HTTPS MCP does not require `OBSIDIAN_VAULT_PATH`, `OBSIDIAN_CONFIG_DIR`,
 `OBSIDIAN_API_KEY`, `OBSIDIAN_API_URL`, a `command`, or an executable path.
 The provider needs only the MCP URL and the bearer token.
 
@@ -88,8 +88,8 @@ The plugin enumerates vault file paths only to implement `list_files` and
 authentication, skips hidden directories and symlinks, and rejects absolute or
 traversal paths.
 
-Every `/mcp` and REST request requires a generated bearer token. HTTP is
-available for trusted loopback testing; HTTPS is recommended. The optional npm
+Every `/mcp` and REST request requires a generated bearer token. HTTP requires
+an explicit testing-only opt-in; HTTPS is recommended. The optional npm
 stdio package can access only the discovered local vault when the bridge is
 unavailable, and does not provide a public network endpoint.
 
@@ -97,11 +97,12 @@ unavailable, and does not provide a public network endpoint.
 
 ```bash
 curl --fail --silent \
+  --cacert /absolute/path/to/localhost.pem \
   -H "Authorization: Bearer <64-character-plugin-token>" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   --data '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' \
-  http://127.0.0.1:27125/mcp
+  https://127.0.0.1:27125/mcp
 ```
 
 The server exposes:
@@ -203,9 +204,9 @@ documents, and the same BM25 implementation used by the plugin and npm package.
 
 | Scale | Initial indexing | Cold query | Warm query | Incremental 1000 | Heap / RSS |
 |---:|---:|---:|---:|---:|---:|
-| 1,000 documents | 254 ms | 0.757 ms | 0.545 ms | 422 ms | 20.3 MB / 86.5 MB |
-| 10,000 documents | 490 ms | 8.953 ms | 7.728 ms | 42.2 ms | 53.8 MB / 138.9 MB |
-| 100,000 documents | 4.890 s | 79.854 ms | 81.186 ms | 31.2 ms | 273.7 MB / 580.9 MB |
+| 1,000 documents | 166.8 ms | 4.885 ms | 3.959 ms | 112.1 ms | 17.7 MB / 85.9 MB |
+| 10,000 documents | 806 ms | 217.063 ms | 225.786 ms | 83.3 ms | 74.3 MB / 171.5 MB |
+| 100,000 documents | 9.502 s | 145.967 ms | 130.562 ms | 113.2 ms | 354.3 MB / 764.4 MB |
 
 Measured metrics:
 
@@ -218,6 +219,9 @@ Measured metrics:
 The benchmark proves indexed-search behavior and incremental updates, not
 semantic similarity from embeddings. It is useful for comparing future search
 implementations against a reproducible baseline.
+
+Field-aware BM25 weights title/H1, headings, tags, and frontmatter above
+unstructured content while preserving exact and filename matches.
 
 `npm test` runs the Bun test suite. `npm run build` type-checks both targets,
 bundles `main.js`, and compiles `dist/a2rg-obsidian-mcp`.

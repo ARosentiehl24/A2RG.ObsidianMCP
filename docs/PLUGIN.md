@@ -2,7 +2,7 @@
 
 Community plugin ID: `mcp-vault-connector`
 
-Current manifest version: `1.0.10`
+Current manifest version: `1.0.11`
 
 ## Responsibilities
 
@@ -13,6 +13,7 @@ The plugin:
 - Serves REST operations and Streamable HTTP MCP at `/mcp`.
 - Authenticates every `/mcp` and REST request with a bearer token.
 - Supports HTTP or local HTTPS on `127.0.0.1`.
+- Starts with local HTTPS enabled; HTTP requires an explicit testing-only opt-in.
 - Generates a local TLS certificate and private key when HTTPS is enabled.
 - Rejects hidden, absolute, traversal, and unsupported-extension paths.
 - Searches Markdown files and resolves internal-link neighbors.
@@ -56,6 +57,7 @@ The settings page provides:
 - The Streamable HTTP MCP endpoint.
 - Enable/disable bridge toggle.
 - Local HTTPS toggle.
+- Explicit testing-only insecure HTTP toggle.
 - Loopback port control.
 - Bearer-token generation and rotation.
 - Public certificate fingerprint and replacement controls.
@@ -79,6 +81,8 @@ HTTPS:
 ```text
 https://127.0.0.1:27125/mcp
 ```
+
+Plain HTTP does not start unless **Allow insecure HTTP** is enabled.
 
 Every request requires:
 
