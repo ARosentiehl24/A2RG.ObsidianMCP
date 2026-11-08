@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.0.12 - 2026-11-07
+
+- Fixed bridge status appearing stopped in settings even while the local HTTPS
+  server was running.
+- Register the settings tab after automatic bridge startup so it observes the
+  correct initial state.
+
 ## 1.0.11 - 2026-11-07
 
 - Added field-aware BM25 ranking for title/H1, headings, tags, frontmatter,

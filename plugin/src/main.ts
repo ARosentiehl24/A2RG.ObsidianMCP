@@ -32,7 +32,6 @@ export default class A2rgMcpBridgePlugin extends Plugin {
       await this.saveData({ ...this.settings });
     }
 
-    this.addSettingTab(new A2rgBridgeSettingTab(this.app, this));
     this.addCommand({
       id: "start-mcp-bridge",
       name: "Start MCP bridge",
@@ -62,6 +61,8 @@ export default class A2rgMcpBridgePlugin extends Plugin {
     if (this.settings.enabled) {
       await this.startBridge();
     }
+
+    this.addSettingTab(new A2rgBridgeSettingTab(this.app, this));
   }
 
   onunload(): void {

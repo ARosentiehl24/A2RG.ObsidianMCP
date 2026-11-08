@@ -2,7 +2,7 @@
 
 Community plugin ID: `mcp-vault-connector`
 
-Current manifest version: `1.0.11`
+Current manifest version: `1.0.12`
 
 ## Responsibilities
 
