@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "bun:test";
 import { ApiClient } from "../src/api";
 import { HttpBridge } from "../plugin/src/bridge/http-bridge";
 import { VaultPort, VaultSearchMatch } from "../plugin/src/ports/vault-port";

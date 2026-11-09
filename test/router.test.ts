@@ -3,7 +3,7 @@ import http from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import test from "node:test";
+import { test } from "bun:test";
 import { ApiClient } from "../src/api";
 import { HybridRouter } from "../src/router";
 import { VaultManager } from "../src/vault";

@@ -11,7 +11,7 @@ import {
 import { gunzipSync } from "node:zlib";
 import os from "node:os";
 import path from "node:path";
-import test from "node:test";
+import { test } from "bun:test";
 import { PersistentSearchCache } from "../src/persistent-search-cache";
 import { extractMatchingLines, TextSearchIndex } from "../src/search-index";
 import { VaultManager } from "../src/vault";

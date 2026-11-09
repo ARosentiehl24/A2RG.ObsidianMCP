@@ -94,6 +94,12 @@ export class HttpTransport {
       timeout = setNodeTimeout(() => {
         timedOut = true;
         request.destroy(new Error("Request timeout"));
+        resolve({
+          ok: false,
+          status: 0,
+          error: "Request timeout",
+          ambiguous: true,
+        });
       }, this.timeoutMs);
 
       request.on("error", (error: NodeJS.ErrnoException) => {

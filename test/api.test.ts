@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import http from "node:http";
-import test from "node:test";
+import { test } from "bun:test";
 import { ApiClient } from "../src/api";
 
 test("ApiClient rejects an unreadable TLS CA path", () => {
@@ -44,75 +44,6 @@ test("ApiClient performs authenticated HTTP search and list requests", async () 
     }
   });
 
-  test("ApiClient refuses plain HTTP unless explicitly allowed", async () => {
-    let requestCount = 0;
-    const server = http.createServer((_request, response) => {
-      requestCount += 1;
-      response.end(JSON.stringify({ status: "ok" }));
-    });
-
-    await new Promise<void>((resolve) => {
-      server.listen(0, "127.0.0.1", resolve);
-    });
-
-    try {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        throw new Error("Test server address unavailable");
-      }
-      const api = new ApiClient(
-        `http://127.0.0.1:${address.port}`,
-        "secret-token",
-        100,
-      );
-      const response = await api.putFile("notes/private.md", "private content");
-
-      assert.equal(response.ok, false);
-      assert.equal(response.status, 0);
-      assert.match(response.error ?? "", /Refusing HTTP transport/);
-      assert.equal(requestCount, 0);
-    } finally {
-      await new Promise<void>((resolve, reject) => {
-        server.close((error) => error ? reject(error) : resolve());
-      });
-    }
-  });
-
-  test("ApiClient marks timed-out append operations as ambiguous", async () => {
-    const server = http.createServer((_request, response) => {
-      setTimeout(() => {
-        response.setHeader("Content-Type", "application/json");
-        response.end(JSON.stringify({ success: true }));
-      }, 150);
-    });
-
-    await new Promise<void>((resolve) => {
-      server.listen(0, "127.0.0.1", resolve);
-    });
-
-    try {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        throw new Error("Test server address unavailable");
-      }
-
-      const api = new ApiClient(
-        `http://127.0.0.1:${address.port}`,
-        "test-key",
-        50,
-        "",
-        true,
-      );
-      const response = await api.appendFile("notes/example.md", " World");
-      assert.equal(response.ok, false);
-      assert.equal(response.status, 0);
-      assert.equal(response.ambiguous, true);
-    } finally {
-      server.closeAllConnections();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
-    }
-  });
-
   await new Promise<void>((resolve) => {
     server.listen(0, "127.0.0.1", resolve);
   });
@@ -150,5 +81,74 @@ test("ApiClient performs authenticated HTTP search and list requests", async () 
     await new Promise<void>((resolve, reject) => {
       server.close((error) => error ? reject(error) : resolve());
     });
+  }
+});
+
+test("ApiClient refuses plain HTTP unless explicitly allowed", async () => {
+  let requestCount = 0;
+  const server = http.createServer((_request, response) => {
+    requestCount += 1;
+    response.end(JSON.stringify({ status: "ok" }));
+  });
+
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
+  });
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Test server address unavailable");
+    }
+    const api = new ApiClient(
+      `http://127.0.0.1:${address.port}`,
+      "secret-token",
+      100,
+    );
+    const response = await api.putFile("notes/private.md", "private content");
+
+    assert.equal(response.ok, false);
+    assert.equal(response.status, 0);
+    assert.match(response.error ?? "", /Refusing HTTP transport/);
+    assert.equal(requestCount, 0);
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => error ? reject(error) : resolve());
+    });
+  }
+});
+
+test("ApiClient marks timed-out append operations as ambiguous", async () => {
+  const server = http.createServer((_request, response) => {
+    setTimeout(() => {
+      response.setHeader("Content-Type", "application/json");
+      response.end(JSON.stringify({ success: true }));
+    }, 150);
+  });
+
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", resolve);
+  });
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Test server address unavailable");
+    }
+
+    const api = new ApiClient(
+      `http://127.0.0.1:${address.port}`,
+      "test-key",
+      50,
+      "",
+      true,
+    );
+    const response = await api.appendFile("notes/example.md", " World");
+    assert.equal(response.ok, false);
+    assert.equal(response.status, 0);
+    assert.equal(response.ambiguous, true);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });
