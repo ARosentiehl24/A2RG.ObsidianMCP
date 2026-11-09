@@ -1,0 +1,433 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Arquitectura de A2RG Obsidian MCP",
+    "locale": "es",
+    "output": "docs/architecture/a2rg-obsidian-mcp-architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/ARosentiehl24/A2RG.ObsidianMCP.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "d94ebc5eaa2e0d2281a2243d029cdff675f6a64d"
+    },
+    "views": [
+      {
+        "id": "direct",
+        "label": "Modo directo",
+        "focus": ["mcp-client", "plugin-bridge", "tool-registry", "obsidian-adapter", "obsidian-apis"],
+        "note": "MCP por HTTP/HTTPS dentro de Obsidian"
+      },
+      {
+        "id": "fallback",
+        "label": "Fallback stdio",
+        "focus": ["mcp-client", "stdio-server", "tool-registry", "hybrid-router", "filesystem-manager", "vault-store"],
+        "note": "Ruta npm/stdio cuando el bridge no está disponible"
+      },
+      {
+        "id": "security",
+        "label": "Seguridad local",
+        "focus": ["plugin-bridge", "rest-client", "filesystem-manager", "search-cache"],
+        "note": "TLS, bearer token, guardas de paths y caché protegida"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "mcp-client",
+      "type": "external",
+      "label": "Cliente MCP",
+      "sublabel": "Copilot / cliente compatible",
+      "pos": [40, 260],
+      "size": [140, 76]
+    },
+    {
+      "id": "plugin-bridge",
+      "type": "security",
+      "label": "Bridge de Obsidian",
+      "sublabel": "/mcp + REST · 127.0.0.1 · HTTPS",
+      "tag": "Bearer token",
+      "pos": [250, 60],
+      "size": [185, 88],
+      "sources": [
+        {
+          "path": "plugin/src/main.ts",
+          "line": 143,
+          "end_line": 194
+        },
+        {
+          "path": "plugin/src/bridge/http-bridge.ts",
+          "line": 47,
+          "end_line": 165
+        },
+        {
+          "path": "plugin/src/bridge/http-bridge.ts",
+          "line": 330,
+          "end_line": 423
+        }
+      ]
+    },
+    {
+      "id": "stdio-server",
+      "type": "backend",
+      "label": "Servidor stdio npm",
+      "sublabel": "CLI + MCP SDK",
+      "tag": "@a2rg/obsidian-mcp",
+      "pos": [250, 500],
+      "size": [185, 80],
+      "sources": [
+        {
+          "path": "src/index.ts",
+          "line": 13,
+          "end_line": 66
+        },
+        {
+          "path": "src/config.ts",
+          "line": 206,
+          "end_line": 306
+        }
+      ]
+    },
+    {
+      "id": "tool-registry",
+      "type": "backend",
+      "label": "Registro de herramientas",
+      "sublabel": "8 tools · validación Zod",
+      "pos": [510, 270],
+      "size": [185, 82],
+      "sources": [
+        {
+          "path": "src/mcp-tool-registry.ts",
+          "line": 25,
+          "end_line": 201
+        }
+      ]
+    },
+    {
+      "id": "obsidian-adapter",
+      "type": "backend",
+      "label": "Adaptador del vault",
+      "sublabel": "CRUD, listado y archivo activo",
+      "pos": [780, 60],
+      "size": [170, 82],
+      "sources": [
+        {
+          "path": "plugin/src/adapters/obsidian-vault-adapter.ts",
+          "line": 21,
+          "end_line": 146
+        }
+      ]
+    },
+    {
+      "id": "obsidian-services",
+      "type": "backend",
+      "label": "Búsqueda y grafo",
+      "sublabel": "BM25 por campos + backlinks",
+      "tag": "Eventos Obsidian",
+      "pos": [780, 190],
+      "size": [170, 82],
+      "sources": [
+        {
+          "path": "plugin/src/services/obsidian-search-service.ts",
+          "line": 35,
+          "end_line": 184
+        },
+        {
+          "path": "plugin/src/services/obsidian-search-service.ts",
+          "line": 214,
+          "end_line": 321
+        },
+        {
+          "path": "plugin/src/services/obsidian-graph-service.ts",
+          "line": 7,
+          "end_line": 126
+        }
+      ]
+    },
+    {
+      "id": "obsidian-apis",
+      "type": "cloud",
+      "label": "APIs de Obsidian",
+      "sublabel": "Vault · metadataCache · workspace",
+      "pos": [1080, 60],
+      "size": [165, 82],
+      "sources": [
+        {
+          "path": "plugin/src/adapters/obsidian-vault-adapter.ts",
+          "line": 30,
+          "end_line": 145
+        },
+        {
+          "path": "plugin/src/services/obsidian-search-service.ts",
+          "line": 42,
+          "end_line": 103
+        }
+      ]
+    },
+    {
+      "id": "vault-store",
+      "type": "database",
+      "label": "Vault local",
+      "sublabel": "Markdown · carpetas · metadatos",
+      "pos": [1080, 340],
+      "size": [165, 82],
+      "sources": [
+        {
+          "path": "plugin/src/adapters/obsidian-vault-adapter.ts",
+          "line": 30,
+          "end_line": 145
+        },
+        {
+          "path": "src/vault.ts",
+          "line": 73,
+          "end_line": 158
+        }
+      ]
+    },
+    {
+      "id": "hybrid-router",
+      "type": "backend",
+      "label": "Router híbrido",
+      "sublabel": "Plugin REST primero · fallback seguro",
+      "pos": [780, 500],
+      "size": [170, 82],
+      "sources": [
+        {
+          "path": "src/router.ts",
+          "line": 5,
+          "end_line": 139
+        }
+      ]
+    },
+    {
+      "id": "rest-client",
+      "type": "security",
+      "label": "Cliente REST seguro",
+      "sublabel": "TLS pin local · timeouts · 5 MB",
+      "tag": "HTTP opt-in",
+      "pos": [1020, 500],
+      "size": [165, 82],
+      "sources": [
+        {
+          "path": "src/api.ts",
+          "line": 20,
+          "end_line": 129
+        },
+        {
+          "path": "src/http-transport.ts",
+          "line": 23,
+          "end_line": 125
+        }
+      ]
+    },
+    {
+      "id": "filesystem-manager",
+      "type": "security",
+      "label": "Fallback de filesystem",
+      "sublabel": "Path guard · O_NOFOLLOW",
+      "pos": [520, 650],
+      "size": [170, 82],
+      "sources": [
+        {
+          "path": "src/vault.ts",
+          "line": 45,
+          "end_line": 158
+        },
+        {
+          "path": "src/vault-path-resolver.ts",
+          "line": 8,
+          "end_line": 95
+        }
+      ]
+    },
+    {
+      "id": "search-cache",
+      "type": "database",
+      "label": "Caché BM25 v4",
+      "sublabel": "gzip · permisos 0600",
+      "pos": [1020, 650],
+      "size": [165, 82],
+      "sources": [
+        {
+          "path": "src/persistent-search-cache.ts",
+          "line": 8,
+          "end_line": 95
+        },
+        {
+          "path": "src/vault.ts",
+          "line": 53,
+          "end_line": 68
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Proceso de Obsidian",
+      "wraps": [
+        "plugin-bridge",
+        "obsidian-adapter",
+        "obsidian-services",
+        "obsidian-apis"
+      ],
+      "pad": 18
+    },
+    {
+      "kind": "region",
+      "label": "Proceso npm / stdio",
+      "wraps": [
+        "stdio-server",
+        "hybrid-router",
+        "rest-client",
+        "filesystem-manager",
+        "search-cache"
+      ],
+      "pad": 18
+    }
+  ],
+  "connections": [
+    {
+      "id": "client-direct",
+      "from": "mcp-client",
+      "to": "plugin-bridge",
+      "label": "Streamable HTTP/HTTPS",
+      "variant": "security"
+    },
+    {
+      "id": "client-stdio",
+      "from": "mcp-client",
+      "to": "stdio-server",
+      "label": "stdio"
+    },
+    {
+      "id": "direct-tools",
+      "from": "plugin-bridge",
+      "to": "tool-registry",
+      "label": "MCP SDK · 8 tools"
+    },
+    {
+      "id": "stdio-tools",
+      "from": "stdio-server",
+      "to": "tool-registry",
+      "label": "MCP SDK · 8 tools"
+    },
+    {
+      "id": "direct-adapter",
+      "from": "tool-registry",
+      "to": "obsidian-adapter",
+      "label": "modo directo",
+      "variant": "emphasis"
+    },
+    {
+      "id": "stdio-router",
+      "from": "tool-registry",
+      "to": "hybrid-router",
+      "label": "modo stdio",
+      "variant": "emphasis"
+    },
+    {
+      "id": "adapter-services",
+      "from": "obsidian-adapter",
+      "to": "obsidian-services",
+      "label": "buscar / grafo",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "adapter-obsidian",
+      "from": "obsidian-adapter",
+      "to": "obsidian-apis",
+      "label": "CRUD + active file"
+    },
+    {
+      "id": "services-metadata",
+      "from": "obsidian-services",
+      "to": "obsidian-apis",
+      "label": "metadata + eventos",
+      "variant": "dashed"
+    },
+    {
+      "id": "obsidian-vault",
+      "from": "obsidian-apis",
+      "to": "vault-store",
+      "label": "lee / escribe notas",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "router-rest",
+      "from": "hybrid-router",
+      "to": "rest-client",
+      "label": "REST preferido"
+    },
+    {
+      "id": "rest-plugin",
+      "from": "rest-client",
+      "to": "plugin-bridge",
+      "label": "HTTPS + bearer",
+      "variant": "security",
+      "fromSide": "right",
+      "toSide": "top",
+      "via": [[1265, 541], [1265, 20], [342.5, 20]]
+    },
+    {
+      "id": "router-fallback",
+      "from": "hybrid-router",
+      "to": "filesystem-manager",
+      "label": "fallback",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "filesystem-vault",
+      "from": "filesystem-manager",
+      "to": "vault-store",
+      "label": "vault local protegido",
+      "variant": "security"
+    },
+    {
+      "id": "filesystem-cache",
+      "from": "filesystem-manager",
+      "to": "search-cache",
+      "label": "snapshot v4",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Dos entradas",
+      "items": [
+        "Modo directo: el plugin sirve Streamable HTTP MCP desde Obsidian.",
+        "Modo stdio: el paquete npm ejecuta MCP como proceso local."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Routing híbrido",
+      "items": [
+        "El stdio intenta primero REST contra el plugin.",
+        "Si no hay respuesta inequívoca, puede usar el filesystem; las mutaciones ambiguas no se repiten."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Seguridad",
+      "items": [
+        "HTTPS local y bearer token por defecto; HTTP solo con opt-in explícito.",
+        "Paths normalizados, symlinks bloqueados y caché escrita con archivo temporal exclusivo."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Búsqueda",
+      "items": [
+        "BM25 por título/H1, headings, tags, frontmatter, nombre y contenido.",
+        "El modo plugin usa eventos y metadataCache; stdio persiste snapshot gzip v4."
+      ]
+    }
+  ]
+}

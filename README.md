@@ -170,6 +170,7 @@ auto-discovery, CLI flags, cache behavior, and publication.
 
 ## Documentation
 
+- [Architecture](docs/ARCHITECTURE.md)
 - [Quick Start](docs/QUICKSTART.md)
 - [Plugin Guide](docs/PLUGIN.md)
 - [MCP Tools](docs/TOOLS.md)
