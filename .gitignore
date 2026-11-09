@@ -7,6 +7,7 @@ main.js
 *.log
 .env
 .mcp.env
+.mcp.json
 data.json
 *.pem
 *.key
