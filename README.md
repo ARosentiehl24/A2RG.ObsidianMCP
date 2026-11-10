@@ -4,7 +4,7 @@ A2RG MCP Bridge connects MCP clients to an open Obsidian vault through a local
 desktop plugin. It exposes eight vault tools through Streamable HTTP MCP and
 keeps an optional Bun stdio process for filesystem fallback.
 
-Current release: `1.0.12`.
+Current release: `1.0.13`.
 
 ## Components
 

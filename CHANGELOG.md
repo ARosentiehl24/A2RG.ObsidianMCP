@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.0.13 - 2026-11-09
+
+- Fixed HTTP transport timeouts to resolve immediately with an ambiguous
+  response instead of waiting for the request error callback.
+- Kept timed-out mutations from being retried by the filesystem fallback.
+- Updated tests to use the Bun test API consistently.
+
 ## 1.0.12 - 2026-11-07
 
 - Fixed bridge status appearing stopped in settings even while the local HTTPS

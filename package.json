@@ -1,6 +1,6 @@
 {
   "name": "@a2rg/obsidian-mcp",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "MCP stdio package for Obsidian with plugin-first REST access and automatic local filesystem fallback",
   "type": "module",
   "main": "./dist/npm/cli.js",

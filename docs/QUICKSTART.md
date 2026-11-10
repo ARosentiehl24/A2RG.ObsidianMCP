@@ -3,7 +3,7 @@
 This guide configures Streamable HTTP MCP first. The stdio executable is only
 an optional fallback.
 
-Current release: `1.0.12`.
+Current release: `1.0.13`.
 
 ## 1. Requirements
 
